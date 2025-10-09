@@ -1,5 +1,5 @@
 ---
-name: "[✨ 기능 요청/기술 개선] 기능 명 / 기술 개선 주제"
+name: Feature Issue Template
 about: Suggest an idea for this project
 title: ''
 labels: ''
