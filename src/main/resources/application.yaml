@@ -1,3 +1,11 @@
 spring:
   application:
     name: knucampus
+
+jwt:
+  access:
+    secret: 66549c74aa0b71af12cfa735490d3c19
+    expired: 18000000
+  refresh:
+    secret: 66549c74aa0b71af12cfa735490d3c19
+    expired: 180000000
