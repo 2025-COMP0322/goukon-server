@@ -15,6 +15,7 @@ java {
 }
 
 configurations {
+
 	compileOnly {
 		extendsFrom annotationProcessor
 	}
@@ -54,6 +55,10 @@ dependencies {
 
     // * SpringDoc
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13'
+
+    // * WebSocket
+    implementation 'org.springframework:spring-websocket'
+    implementation 'org.springframework:spring-messaging'
 }
 
 tasks.named('test') {
