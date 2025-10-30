@@ -1,5 +1,6 @@
 package com.kr.knucampus.domain.chatroom;
 
+import com.kr.knucampus.domain.baseentity.BaseEntity;
 import com.kr.knucampus.domain.matchingsession.MatchingSession;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -15,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ChatRoom {
+public class ChatRoom extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

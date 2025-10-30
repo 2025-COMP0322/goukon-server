@@ -1,5 +1,6 @@
 package com.kr.knucampus.domain.group;
 
+import com.kr.knucampus.domain.baseentity.BaseEntity;
 import com.kr.knucampus.domain.student.Gender;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -15,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Group {
+public class Group extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

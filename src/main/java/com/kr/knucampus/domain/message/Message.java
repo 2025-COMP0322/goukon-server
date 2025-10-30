@@ -1,5 +1,6 @@
 package com.kr.knucampus.domain.message;
 
+import com.kr.knucampus.domain.baseentity.BaseEntity;
 import com.kr.knucampus.domain.chatroom.ChatRoom;
 import com.kr.knucampus.domain.student.Student;
 import jakarta.persistence.Column;
@@ -17,7 +18,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Message {
+public class Message extends BaseEntity {
 
     @Id
     @Column(name = "message_id")
