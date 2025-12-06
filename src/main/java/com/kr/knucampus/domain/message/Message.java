@@ -1,44 +1,61 @@
 package com.kr.knucampus.domain.message;
 
-import com.kr.knucampus.domain.baseentity.BaseEntity;
 import com.kr.knucampus.domain.chatroom.ChatRoom;
 import com.kr.knucampus.domain.student.Student;
 import jakarta.persistence.Column;
+import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
-import java.time.LocalDateTime;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "message")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Message extends BaseEntity {
+@EntityListeners(AuditingEntityListener.class)
+public class Message {
 
-    @Id
-    @Column(name = "message_id")
-    private Long id;
+    @EmbeddedId
+    private MessageId id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "chat_room_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("sessionId")
+    @JoinColumn(name = "session_id")
     private ChatRoom chatRoom;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "student_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("studentId")
+    @JoinColumn(name = "student_id")
     private Student sender;
 
-    @Column(nullable = false, columnDefinition = "CLOB")
+    @Lob
+    @Column(nullable = false)
     private String content;
 
-    @Builder
-    public Message(ChatRoom chatRoom, Student sender, String content, LocalDateTime createdAt) {
+    @CreatedDate
+    @Column(name = "created_at", updatable = false, nullable = false)
+    private LocalDateTime createdAt;
+
+    private Message(ChatRoom chatRoom, Student sender, Long messageId, String content) {
+        this.id = new MessageId(chatRoom.getId(), sender.getId(), messageId);
         this.chatRoom = chatRoom;
         this.sender = sender;
         this.content = content;
+    }
+
+    public static Message create(ChatRoom chatRoom, Student sender, Long messageId, String content) {
+        return new Message(chatRoom, sender, messageId, content);
     }
 }
