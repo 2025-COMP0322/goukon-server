@@ -1,8 +1,8 @@
 package com.kr.knucampus.application.auth;
 
 import com.kr.knucampus.application.token.TokenService;
-import com.kr.knucampus.domain.member.Member;
-import com.kr.knucampus.domain.member.repository.MemberRepository;
+import com.kr.knucampus.domain.student.Student;
+import com.kr.knucampus.domain.student.repository.StudentRepository;
 import com.kr.knucampus.domain.token.TokenType;
 import com.kr.knucampus.global.exception.BusinessException;
 import com.kr.knucampus.presentation.auth.dto.request.LoginRequest;
@@ -14,42 +14,64 @@ import com.kr.knucampus.presentation.auth.dto.response.SignUp201Response;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import static com.kr.knucampus.global.exception.ErrorCode.*;
 import static com.kr.knucampus.global.status.SuccessCode.*;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AuthService {
-    private final MemberRepository memberRepository;
+    private final StudentRepository studentRepository;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
 
-    public SignUp201Response signUp(SignUpRequest request){
-        Member member = request.toEntity();
-        member.encryptPassword(passwordEncoder);
-        memberRepository.save(member);
-        return SignUp201Response.of(member);
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public SignUp201Response signUp(SignUpRequest request) {
+        // 이메일 중복 체크
+        if (studentRepository.existsByEmail(request.email())) {
+            throw new BusinessException(DUPLICATE_EMAIL);
+        }
+
+        // 학번 중복 체크
+        if (studentRepository.existsByStudentNumber(request.studentNumber())) {
+            throw new BusinessException(DUPLICATE_STUDENT_NUMBER);
+        }
+
+        Student student = request.toEntity();
+        student.encryptPassword(passwordEncoder);
+        studentRepository.save(student);
+
+        return SignUp201Response.of(student);
     }
 
-    public Login200Response login(LoginRequest request){
-        Member member = memberRepository.findByEmail(request.email())
+    public Login200Response login(LoginRequest request) {
+        Student student = studentRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BusinessException(NO_USER));
-        if(!member.matchPassword(request.password(), passwordEncoder)){
+
+        if (!student.matchPassword(request.password(), passwordEncoder)) {
             throw new BusinessException(WRONG_PASSWORD);
         }
-        String accessToken = tokenService.getToken(TokenType.ACCESS, member.getId());
-        String refreshToken = tokenService.getToken(TokenType.REFRESH, member.getId());
+
+        String accessToken = tokenService.getToken(TokenType.ACCESS, student.getId());
+        String refreshToken = tokenService.getToken(TokenType.REFRESH, student.getId());
+
         return new Login200Response(accessToken, refreshToken);
     }
 
-    public PasswordReset200Response passwordReset(Long memberId, PasswordResetRequest request){
-        Member member = memberRepository.findById(memberId)
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public PasswordReset200Response passwordReset(Long studentId, PasswordResetRequest request) {
+        Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new BusinessException(NO_USER));
-        if(!member.matchPassword(request.password(), passwordEncoder)){
+
+        if (!student.matchPassword(request.password(), passwordEncoder)) {
             throw new BusinessException(WRONG_PASSWORD);
         }
-        member.modifyPassword(request.newPassword(), passwordEncoder);
+
+        student.modifyPassword(request.newPassword(), passwordEncoder);
+
         return new PasswordReset200Response(PASSWORD_CHANGED.getMessage());
     }
 }
