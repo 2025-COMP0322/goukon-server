@@ -2,10 +2,44 @@ spring:
   application:
     name: knucampus
 
+  # Database Configuration
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521:xe
+    username: ${DB_USERNAME:system}
+    password: ${DB_PASSWORD:oracle}
+    driver-class-name: oracle.jdbc.OracleDriver
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.OracleDialect
+
+  # ActiveMQ Configuration
+  activemq:
+    broker-url: vm://localhost?broker.persistent=false
+    in-memory: true
+
+# JWT Configuration
 jwt:
   access:
     secret: 66549c74aa0b71af12cfa735490d3c19
-    expired: 18000000
+    expired: 18000000  # 5 hours
   refresh:
     secret: 66549c74aa0b71af12cfa735490d3c19
-    expired: 180000000
+    expired: 180000000  # 50 hours
+
+# Server Configuration
+server:
+  port: 8080
+
+# Logging
+logging:
+  level:
+    com.kr.knucampus: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.springframework.jms: DEBUG
