@@ -1,18 +1,25 @@
 package com.kr.knucampus.presentation.auth.dto.response;
 
-import com.kr.knucampus.domain.member.Member;
+import com.kr.knucampus.domain.student.Student;
 
 public record SignUp201Response(
-        String nickname,
-        String mbti,
-        String gender
+        Long id,
+        String studentNumber,
+        String name,
+        String email,
+        String gender,
+        String department,
+        String mbti
 ) {
-    public static SignUp201Response of(Member member){
-        String gender = member.isMale() ? "MALE": "FEMALE";
+    public static SignUp201Response of(Student student) {
         return new SignUp201Response(
-                member.getNickname(),
-                member.getMbti().name(),
-                gender
+                student.getId(),
+                student.getStudentNumber(),
+                student.getName(),
+                student.getEmail(),
+                student.getGender().name(),
+                student.getDepartment(),
+                student.getMbti() != null ? student.getMbti().name() : null
         );
     }
 }

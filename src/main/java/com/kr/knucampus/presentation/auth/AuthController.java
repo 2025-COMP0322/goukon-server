@@ -8,6 +8,7 @@ import com.kr.knucampus.presentation.auth.dto.request.SignUpRequest;
 import com.kr.knucampus.presentation.auth.dto.response.Login200Response;
 import com.kr.knucampus.presentation.auth.dto.response.PasswordReset200Response;
 import com.kr.knucampus.presentation.auth.dto.response.SignUp201Response;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,19 +21,19 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signup")
-    public ResponseEntity<SignUp201Response> signUp(@RequestBody SignUpRequest request){
+    public ResponseEntity<SignUp201Response> signUp(@Valid @RequestBody SignUpRequest request){
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(authService.signUp(request));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Login200Response> login(@RequestBody LoginRequest request){
+    public ResponseEntity<Login200Response> login(@Valid @RequestBody LoginRequest request){
         return ResponseEntity.ok().body(authService.login(request));
     }
 
     @PatchMapping("/reset")
-    public ResponseEntity<PasswordReset200Response> passwordReset(@AuthUser Long memberId, @RequestBody PasswordResetRequest request){
+    public ResponseEntity<PasswordReset200Response> passwordReset(@AuthUser Long studentId, @Valid @RequestBody PasswordResetRequest request){
         return ResponseEntity.ok()
-                .body(authService.passwordReset(memberId, request));
+                .body(authService.passwordReset(studentId, request));
     }
 }
