@@ -6,7 +6,7 @@ plugins {
 
 group = 'com.kr'
 version = '0.0.1-SNAPSHOT'
-description = 'KNU-CAMPUS-SERVER'
+description = 'goukon-server'
 
 java {
     toolchain {

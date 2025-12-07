@@ -1,0 +1,19 @@
+# Database Configuration
+db:
+  url: jdbc:oracle:thin:@localhost:1521/XE
+  username: university
+  password: tjdudrbs
+  driver: oracle.jdbc.OracleDriver
+
+  # Connection Pool Settings
+  pool:
+    initialSize: 5
+    maxTotal: 10
+    maxIdle: 5
+    minIdle: 2
+
+# Flyway Configuration
+flyway:
+  enabled: true
+  baselineOnMigrate: true
+  validateOnMigrate: true

@@ -1,12 +1,12 @@
 spring:
   application:
-    name: knucampus
+    name: goukon-server
 
   # Database Configuration
   datasource:
-    url: jdbc:oracle:thin:@localhost:1521:xe
+    url: ${DB_URL:jdbc:oracle:thin:@localhost:1521:xe}
     username: ${DB_USERNAME:system}
-    password: ${DB_PASSWORD:oracle}
+    password: ${DB_PASSWORD:tjdudrbs}
     driver-class-name: oracle.jdbc.OracleDriver
 
   # JPA Configuration
@@ -21,25 +21,25 @@ spring:
 
   # ActiveMQ Configuration
   activemq:
-    broker-url: vm://localhost?broker.persistent=false
+    broker-url: ${ACTIVEMQ_BROKER_URL:vm://localhost?broker.persistent=false}
     in-memory: true
 
 # JWT Configuration
 jwt:
   access:
-    secret: 66549c74aa0b71af12cfa735490d3c19
-    expired: 18000000  # 5 hours
+    secret: ${JWT_ACCESS_SECRET:66549c74aa0b71af12cfa735490d3c19}
+    expired: ${JWT_ACCESS_EXPIRED:18000000}
   refresh:
-    secret: 66549c74aa0b71af12cfa735490d3c19
-    expired: 180000000  # 50 hours
+    secret: ${JWT_REFRESH_SECRET:66549c74aa0b71af12cfa735490d3c19}
+    expired: ${JWT_REFRESH_EXPIRED:180000000}
 
 # Server Configuration
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 # Logging
 logging:
   level:
-    com.kr.knucampus: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.springframework.jms: DEBUG
+    com.kr.goukon: ${LOG_LEVEL:DEBUG}
+    org.hibernate.SQL: ${LOG_LEVEL:DEBUG}
+    org.springframework.jms: ${LOG_LEVEL:DEBUG}
