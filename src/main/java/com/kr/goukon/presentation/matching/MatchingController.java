@@ -9,7 +9,9 @@ import com.kr.goukon.global.exception.BusinessException;
 import com.kr.goukon.global.exception.ErrorCode;
 import com.kr.goukon.presentation.matching.dto.request.RegisterQueueRequest;
 import com.kr.goukon.presentation.matching.dto.response.MatchingQueueResponse;
+import com.kr.goukon.presentation.matching.dto.response.SessionDetailResponse;
 import com.kr.goukon.presentation.matching.dto.response.SessionMatchResponse;
+import com.kr.goukon.presentation.group.dto.response.GroupDetailResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -71,5 +73,20 @@ public class MatchingController {
                 .map(SessionMatchResponse::from)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 매칭 세션 상세 조회 (우리 팀 + 상대 팀 정보)
+     */
+    @GetMapping("/sessions/{sessionId}/details")
+    public ResponseEntity<SessionDetailResponse> getSessionDetails(
+            @PathVariable Long sessionId,
+            @AuthUser Long studentId) {
+        MatchingService.SessionDetailData data = matchingService.getSessionDetails(sessionId, studentId);
+
+        GroupDetailResponse myGroupResponse = GroupDetailResponse.from(data.myGroup(), data.myMembers());
+        GroupDetailResponse opponentGroupResponse = GroupDetailResponse.from(data.opponentGroup(), data.opponentMembers());
+
+        return ResponseEntity.ok(SessionDetailResponse.of(sessionId, myGroupResponse, opponentGroupResponse));
     }
 }

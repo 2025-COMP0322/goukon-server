@@ -44,6 +44,8 @@ public enum ErrorCode {
     INVALID_MATCHING_TYPE(HttpStatus.BAD_REQUEST, "ME_006", "유효하지 않은 매칭 타입입니다."),
     MEMBER_COUNT_MISMATCH(HttpStatus.BAD_REQUEST, "ME_007", "매칭 타입에 맞는 인원이 아닙니다. (1:1은 1명, 3:3은 3명)"),
     MATCHING_IN_PROGRESS(HttpStatus.CONFLICT, "ME_008", "이미 매칭이 진행중입니다."),
+    INVALID_SESSION_STATE(HttpStatus.INTERNAL_SERVER_ERROR, "ME_009", "세션 상태가 올바르지 않습니다."),
+    NOT_SESSION_MEMBER(HttpStatus.FORBIDDEN, "ME_010", "해당 세션의 멤버가 아닙니다."),
 
     // * ChatRoom
     CHATROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CE_001", "채팅방을 찾을 수 없습니다."),

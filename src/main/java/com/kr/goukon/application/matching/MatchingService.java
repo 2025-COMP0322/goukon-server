@@ -15,6 +15,7 @@ import com.kr.goukon.domain.matchingsession.repository.MatchingSessionRepository
 import com.kr.goukon.domain.sessionmatches.SessionMatches;
 import com.kr.goukon.domain.sessionmatches.repository.SessionMatchesRepository;
 import com.kr.goukon.domain.student.Gender;
+import com.kr.goukon.domain.student.Student;
 import com.kr.goukon.domain.studentgroup.repository.StudentGroupRepository;
 import com.kr.goukon.global.exception.BusinessException;
 import com.kr.goukon.global.exception.ErrorCode;
@@ -29,6 +30,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -220,4 +222,64 @@ public class MatchingService {
     public List<SessionMatches> getStudentSessions(Long studentId) {
         return sessionMatchesRepository.findByStudentId(studentId);
     }
+
+    /**
+     * 매칭 세션 상세 정보 조회
+     * 요청자의 그룹과 상대 그룹 정보를 반환
+     */
+    public SessionDetailData getSessionDetails(Long sessionId, Long studentId) {
+        // 세션의 두 그룹 조회
+        List<SessionMatches> matches = sessionMatchesRepository.findBySessionId(sessionId);
+
+        if (matches.isEmpty()) {
+            throw new BusinessException(ErrorCode.MATCHING_SESSION_NOT_FOUND);
+        }
+
+        if (matches.size() != 2) {
+            throw new BusinessException(ErrorCode.INVALID_SESSION_STATE);
+        }
+
+        // 요청자가 속한 그룹 찾기
+        Group myGroup = null;
+        Group opponentGroup = null;
+
+        for (SessionMatches match : matches) {
+            Long groupId = match.getGroup().getId();
+            boolean isMember = studentGroupRepository.existsByStudentIdAndGroupId(studentId, groupId);
+
+            if (isMember) {
+                myGroup = match.getGroup();
+            } else {
+                opponentGroup = match.getGroup();
+            }
+        }
+
+        if (myGroup == null) {
+            throw new BusinessException(ErrorCode.NOT_SESSION_MEMBER);
+        }
+
+        // 각 그룹의 멤버 조회
+        List<Student> myMembers = studentGroupRepository.findByGroupId(myGroup.getId())
+                .stream()
+                .map(sg -> sg.getStudent())
+                .collect(Collectors.toList());
+
+        List<Student> opponentMembers = studentGroupRepository.findByGroupId(opponentGroup.getId())
+                .stream()
+                .map(sg -> sg.getStudent())
+                .collect(Collectors.toList());
+
+        return new SessionDetailData(sessionId, myGroup, myMembers, opponentGroup, opponentMembers);
+    }
+
+    /**
+     * 세션 상세 데이터 DTO
+     */
+    public record SessionDetailData(
+            Long sessionId,
+            Group myGroup,
+            List<Student> myMembers,
+            Group opponentGroup,
+            List<Student> opponentMembers
+    ) {}
 }
