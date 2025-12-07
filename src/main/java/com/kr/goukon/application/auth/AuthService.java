@@ -12,9 +12,10 @@ import com.kr.goukon.presentation.auth.dto.response.Login200Response;
 import com.kr.goukon.presentation.auth.dto.response.PasswordReset200Response;
 import com.kr.goukon.presentation.auth.dto.response.SignUp201Response;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import static com.kr.goukon.global.exception.ErrorCode.*;
@@ -22,27 +23,34 @@ import static com.kr.goukon.global.status.SuccessCode.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class AuthService {
     private final StudentRepository studentRepository;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional
     public SignUp201Response signUp(SignUpRequest request) {
-        // 이메일 중복 체크
+        // 사전 중복 체크 (사용자 친화적 에러 메시지용)
         if (studentRepository.existsByEmail(request.email())) {
             throw new BusinessException(DUPLICATE_EMAIL);
         }
-
-        // 학번 중복 체크
         if (studentRepository.existsByStudentNumber(request.studentNumber())) {
             throw new BusinessException(DUPLICATE_STUDENT_NUMBER);
         }
 
         Student student = request.toEntity();
         student.encryptPassword(passwordEncoder);
-        studentRepository.save(student);
+
+        try {
+            studentRepository.save(student);
+            studentRepository.flush(); // 즉시 DB 반영하여 제약조건 검증
+        } catch (DataIntegrityViolationException e) {
+            // Race condition 발생 시 DB 제약조건에 의해 예외 발생
+            log.warn("Duplicate key violation during signup: {}", e.getMessage());
+            throw new BusinessException(DUPLICATE_EMAIL);
+        }
 
         return SignUp201Response.of(student);
     }
@@ -68,7 +76,7 @@ public class AuthService {
         return new Login200Response(accessToken, refreshToken);
     }
 
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional
     public PasswordReset200Response passwordReset(Long studentId, PasswordResetRequest request) {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new BusinessException(NO_USER));

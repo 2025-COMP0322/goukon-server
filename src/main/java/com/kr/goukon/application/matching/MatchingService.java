@@ -52,11 +52,7 @@ public class MatchingService {
     private final StudentRepository studentRepository;
     private final RabbitTemplate rabbitTemplate;
 
-    /**
-     * 매칭 대기열에 등록
-     * 트랜잭션 격리 수준: SERIALIZABLE - 동시 등록 방지
-     */
-    @Transactional(isolation = Isolation.SERIALIZABLE, propagation = Propagation.REQUIRED)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public MatchingQueue registerQueue(Long groupId, MatchingType matchingType) {
         // 그룹 존재 확인 및 비관적 락
         Group group = groupRepository.findByIdWithLock(groupId)
@@ -90,9 +86,6 @@ public class MatchingService {
         return queue;
     }
 
-    /**
-     * 매칭 대기열 취소
-     */
     @Transactional
     public void cancelQueue(Long groupId) {
         MatchingQueue queue = matchingQueueRepository.findByGroupId(groupId)
@@ -112,9 +105,6 @@ public class MatchingService {
         log.info("Group {} cancelled matching queue", groupId);
     }
 
-    /**
-     * RabbitMQ로 매칭 요청 전송
-     */
     private void sendMatchingRequest(MatchingQueue queue, Gender gender) {
         MatchingQueueMessage message = new MatchingQueueMessage(
                 queue.getId(),
@@ -130,12 +120,8 @@ public class MatchingService {
         log.debug("Sent matching request to RabbitMQ: {}", message);
     }
 
-    /**
-     * RabbitMQ 리스너 - 매칭 처리
-     * 트랜잭션 격리 수준: SERIALIZABLE - 동시 매칭 방지
-     */
     @RabbitListener(queues = RabbitMQConfig.MATCHING_QUEUE)
-    @Transactional(isolation = Isolation.SERIALIZABLE, propagation = Propagation.REQUIRED)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public void processMatchingRequest(MatchingQueueMessage message) {
         log.info("Processing matching request for queue {}", message.getQueueId());
 
@@ -174,9 +160,6 @@ public class MatchingService {
         }
     }
 
-    /**
-     * 매칭 실행 - 세션 생성 및 채팅방 생성
-     */
     private void executeMatching(MatchingQueue queue1, MatchingQueue queue2) {
         // 매칭 세션 생성
         MatchingSession session = MatchingSession.create();
@@ -289,11 +272,6 @@ public class MatchingService {
             List<Student> opponentMembers
     ) {}
 
-    /**
-     * 세션 종료 투표
-     * 트랜잭션 격리 수준: SERIALIZABLE - 동시 투표로 인한 race condition 방지
-     * @return 세션이 종료되었는지 여부
-     */
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public EndVoteResult voteEndSession(Long sessionId, Long studentId) {
         // 세션 조회 (비관적 락)

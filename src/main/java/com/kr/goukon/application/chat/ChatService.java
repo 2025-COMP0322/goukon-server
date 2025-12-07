@@ -18,7 +18,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -61,11 +60,7 @@ public class ChatService {
         messagingTemplate.convertAndSend("/topic/chatroom/" + message.roomId(), leaveMessage);
     }
 
-    /**
-     * 메시지 저장
-     * 트랜잭션 격리 수준: SERIALIZABLE - 메시지 ID 생성 시 동시성 제어
-     */
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional
     public Message saveMessage(Long sessionId, Long senderId, String content) {
         if (content == null || content.isBlank()) {
             throw new BusinessException(ErrorCode.EMPTY_MESSAGE);

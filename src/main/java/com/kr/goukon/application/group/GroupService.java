@@ -31,11 +31,7 @@ public class GroupService {
     private final StudentRepository studentRepository;
     private final StudentGroupRepository studentGroupRepository;
 
-    /**
-     * 그룹 생성
-     * 트랜잭션 격리 수준: SERIALIZABLE - 동시 생성 방지
-     */
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional
     public Group createGroup(Long creatorId) {
         Student creator = studentRepository.findById(creatorId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDENT_NOT_FOUND));
@@ -82,10 +78,6 @@ public class GroupService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 그룹에 멤버 추가
-     * 트랜잭션 격리 수준: SERIALIZABLE - 동시 추가 방지, 인원 제한 보장
-     */
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public void addMember(Long groupId, Long studentId, Long requesterId) {
         // 요청자가 그룹의 멤버인지 확인 (그룹 멤버만 초대 가능)
@@ -128,12 +120,7 @@ public class GroupService {
         log.info("Student {} added to group {} by requester {}", studentId, groupId, requesterId);
     }
 
-    /**
-     * 그룹에서 멤버 제거
-     * 트랜잭션 격리 수준: REPEATABLE_READ
-     * requesterId: 요청자 (자기 자신을 제거하거나, 그룹 멤버가 다른 멤버를 제거)
-     */
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional
     public void removeMember(Long groupId, Long studentId, Long requesterId) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
@@ -168,19 +155,12 @@ public class GroupService {
         }
     }
 
-    /**
-     * 그룹에서 멤버 제거 (본인)
-     */
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional
     public void removeMember(Long groupId, Long studentId) {
         removeMember(groupId, studentId, studentId);
     }
 
-    /**
-     * 그룹 삭제
-     * 트랜잭션 격리 수준: SERIALIZABLE
-     */
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional
     public void deleteGroup(Long groupId, Long requesterId) {
         Group group = groupRepository.findByIdWithLock(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
