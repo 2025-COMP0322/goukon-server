@@ -1,5 +1,6 @@
 package com.kr.goukon.application.student;
 
+import com.kr.goukon.domain.student.Gender;
 import com.kr.goukon.domain.student.Mbti;
 import com.kr.goukon.domain.student.Student;
 import com.kr.goukon.domain.student.repository.StudentRepository;
@@ -7,7 +8,6 @@ import com.kr.goukon.global.exception.BusinessException;
 import com.kr.goukon.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -45,10 +45,10 @@ public class StudentService {
 
     /**
      * 프로필 정보 업데이트
-     * 트랜잭션 격리 수준: REPEATABLE_READ - 동시 수정 방지
      */
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public Student updateProfile(Long studentId, String name, String mbtiStr, String profile, String department) {
+    @Transactional
+    public Student updateProfile(Long studentId, String name, String mbtiStr, String profile,
+                                  String department, Integer age, String genderStr) {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDENT_NOT_FOUND));
 
@@ -61,7 +61,16 @@ public class StudentService {
             }
         }
 
-        student.updateProfile(name, mbti, profile, department);
+        Gender gender = null;
+        if (genderStr != null && !genderStr.isBlank()) {
+            try {
+                gender = Gender.valueOf(genderStr);
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT);
+            }
+        }
+
+        student.updateProfile(name, mbti, profile, department, age, gender);
         return student;
     }
 

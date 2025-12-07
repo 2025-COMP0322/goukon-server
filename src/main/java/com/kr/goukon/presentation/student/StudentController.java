@@ -49,7 +49,9 @@ public class StudentController {
                 request.name(),
                 request.mbti(),
                 request.profile(),
-                request.department()
+                request.department(),
+                request.age(),
+                request.gender()
         );
         return ResponseEntity.ok(StudentResponse.from(student));
     }

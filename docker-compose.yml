@@ -1,0 +1,117 @@
+# ===================================
+# Goukon Server - Docker Compose
+# ===================================
+# Services: Oracle XE, Valkey, RabbitMQ, Spring Boot
+
+services:
+  # Oracle XE Database
+  oracle-db:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: goukon-oracle
+    environment:
+      ORACLE_PASSWORD: ${DB_PASSWORD:-goukon123}
+    ports:
+      - "40004:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - goukon-network
+
+  # Valkey (Redis Alternative) - 초대 코드 저장
+  valkey:
+    image: ghcr.io/valkey-io/valkey:7.2
+    container_name: goukon-valkey
+    command: ["valkey-server", "--port", "6379"]
+    ports:
+      - "40001:6379"
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - goukon-network
+
+  # RabbitMQ - Message Queue
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: goukon-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-goukon}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-goukon123}
+    ports:
+      - "40002:5672"     # AMQP
+      - "40003:15672"    # Management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - goukon-network
+
+  # Goukon Spring Boot Application
+  goukon-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goukon-server
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+      # Database
+      DB_URL: jdbc:oracle:thin:@oracle-db:1521/XEPDB1
+      DB_USERNAME: ${DB_USERNAME:-system}
+      DB_PASSWORD: ${DB_PASSWORD:-goukon123}
+      # Valkey (Redis)
+      VALKEY_HOST: valkey
+      VALKEY_PORT: 6379
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-goukon}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-goukon123}
+      # JWT
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-66549c74aa0b71af12cfa735490d3c19}
+      JWT_ACCESS_EXPIRED: ${JWT_ACCESS_EXPIRED:-18000000}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-66549c74aa0b71af12cfa735490d3c19}
+      JWT_REFRESH_EXPIRED: ${JWT_REFRESH_EXPIRED:-180000000}
+      # Invite Code
+      INVITE_CODE_TTL: ${INVITE_CODE_TTL:-3600}
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+    ports:
+      - "40000:8080"  # 외부:내부 (프론트엔드 호환성 유지)
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - goukon-network
+    restart: unless-stopped
+
+volumes:
+  oracle-data:
+    name: goukon-oracle-data
+  valkey-data:
+    name: goukon-valkey-data
+  rabbitmq-data:
+    name: goukon-rabbitmq-data
+
+networks:
+  goukon-network:
+    name: goukon-network
+    driver: bridge

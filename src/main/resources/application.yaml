@@ -19,10 +19,19 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.OracleDialect
 
-  # ActiveMQ Configuration
-  activemq:
-    broker-url: ${ACTIVEMQ_BROKER_URL:vm://localhost?broker.persistent=false}
-    in-memory: true
+  # RabbitMQ Configuration
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+
+  # Redis/Valkey Configuration
+  data:
+    redis:
+      host: ${VALKEY_HOST:localhost}
+      port: ${VALKEY_PORT:6379}
+      timeout: 5000ms
 
 # JWT Configuration
 jwt:
@@ -33,13 +42,28 @@ jwt:
     secret: ${JWT_REFRESH_SECRET:66549c74aa0b71af12cfa735490d3c19}
     expired: ${JWT_REFRESH_EXPIRED:180000000}
 
+# Invite Code Configuration
+invite:
+  code:
+    ttl: ${INVITE_CODE_TTL:3600}
+
 # Server Configuration
 server:
   port: ${SERVER_PORT:8080}
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
 
 # Logging
 logging:
   level:
     com.kr.goukon: ${LOG_LEVEL:DEBUG}
     org.hibernate.SQL: ${LOG_LEVEL:DEBUG}
-    org.springframework.jms: ${LOG_LEVEL:DEBUG}
+    org.springframework.amqp: ${LOG_LEVEL:DEBUG}

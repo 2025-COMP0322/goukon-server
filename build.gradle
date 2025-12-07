@@ -10,7 +10,7 @@ description = 'goukon-server'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -63,9 +63,14 @@ dependencies {
     // * Oracle
     implementation 'com.oracle.database.jdbc:ojdbc11:23.2.0.0'
 
-    // * ActiveMQ (JMS)
-    implementation 'org.springframework.boot:spring-boot-starter-activemq'
-    implementation 'org.apache.activemq:activemq-broker'
+    // * RabbitMQ (AMQP) - Message Queue
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
+    // * Redis/Valkey - Invite Code Storage
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // * Actuator - Health Check
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
 }
 

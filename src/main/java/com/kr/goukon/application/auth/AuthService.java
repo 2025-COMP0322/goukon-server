@@ -74,4 +74,14 @@ public class AuthService {
 
         return new PasswordReset200Response(PASSWORD_CHANGED.getMessage());
     }
+
+    // 이메일 중복 확인
+    public boolean checkEmailExists(String email) {
+        return studentRepository.existsByEmail(email);
+    }
+
+    // 학번 중복 확인
+    public boolean checkStudentNumberExists(String studentNumber) {
+        return studentRepository.existsByStudentNumber(studentNumber);
+    }
 }

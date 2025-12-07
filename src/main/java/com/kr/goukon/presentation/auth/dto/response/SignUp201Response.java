@@ -17,7 +17,7 @@ public record SignUp201Response(
                 student.getStudentNumber(),
                 student.getName(),
                 student.getEmail(),
-                student.getGender().name(),
+                student.getGender() != null ? student.getGender().name() : null,
                 student.getDepartment(),
                 student.getMbti() != null ? student.getMbti().name() : null
         );

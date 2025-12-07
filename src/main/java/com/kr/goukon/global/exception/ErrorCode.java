@@ -58,6 +58,11 @@ public enum ErrorCode {
     EMPTY_REPORT_CONTENT(HttpStatus.BAD_REQUEST, "RE_002", "신고 내용이 비어있습니다."),
     INVALID_REPORT_STATUS(HttpStatus.BAD_REQUEST, "RE_003", "유효하지 않은 신고 상태입니다."),
 
+    // * Invite Code
+    INVALID_INVITE_CODE(HttpStatus.BAD_REQUEST, "IC_001", "유효하지 않거나 만료된 초대 코드입니다."),
+    INVITE_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "IC_002", "초대 코드가 만료되었습니다."),
+    INVITE_CODE_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "IC_003", "초대 코드 생성에 실패했습니다."),
+
     // * Common
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "CE_001", "서버 내부 오류가 발생했습니다."),
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "CE_002", "입력값이 올바르지 않습니다."),

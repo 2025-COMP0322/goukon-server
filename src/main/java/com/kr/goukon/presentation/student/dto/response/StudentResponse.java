@@ -9,12 +9,13 @@ public record StudentResponse(
         String studentNumber,
         String name,
         String email,
-        int age,
+        Integer age,
         String gender,
         String department,
         String mbti,
         String profile,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        boolean profileComplete
 ) {
     public static StudentResponse from(Student student) {
         return new StudentResponse(
@@ -23,11 +24,12 @@ public record StudentResponse(
                 student.getName(),
                 student.getEmail(),
                 student.getAge(),
-                student.getGender().name(),
+                student.getGender() != null ? student.getGender().name() : null,
                 student.getDepartment(),
                 student.getMbti() != null ? student.getMbti().name() : null,
                 student.getProfile(),
-                student.getCreatedAt()
+                student.getCreatedAt(),
+                student.isProfileComplete()
         );
     }
 }

@@ -18,10 +18,11 @@ import com.kr.goukon.domain.student.Gender;
 import com.kr.goukon.domain.studentgroup.repository.StudentGroupRepository;
 import com.kr.goukon.global.exception.BusinessException;
 import com.kr.goukon.global.exception.ErrorCode;
+import com.kr.goukon.global.config.RabbitMQConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.jms.annotation.JmsListener;
-import org.springframework.jms.core.JmsTemplate;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
@@ -41,9 +42,7 @@ public class MatchingService {
     private final ChatRoomRepository chatRoomRepository;
     private final GroupRepository groupRepository;
     private final StudentGroupRepository studentGroupRepository;
-    private final JmsTemplate jmsTemplate;
-
-    private static final String MATCHING_QUEUE = "matching.queue";
+    private final RabbitTemplate rabbitTemplate;
 
     /**
      * 매칭 대기열에 등록
@@ -76,7 +75,7 @@ public class MatchingService {
         // 그룹 상태 변경
         group.startQueuing();
 
-        // ActiveMQ에 매칭 요청 전송
+        // RabbitMQ에 매칭 요청 전송
         sendMatchingRequest(queue, group.getGender());
 
         log.info("Group {} registered to matching queue with type {}", groupId, matchingType);
@@ -85,9 +84,8 @@ public class MatchingService {
 
     /**
      * 매칭 대기열 취소
-     * 트랜잭션 격리 수준: REPEATABLE_READ
      */
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional
     public void cancelQueue(Long groupId) {
         MatchingQueue queue = matchingQueueRepository.findByGroupId(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MATCHING_QUEUE_NOT_FOUND));
@@ -107,7 +105,7 @@ public class MatchingService {
     }
 
     /**
-     * ActiveMQ로 매칭 요청 전송
+     * RabbitMQ로 매칭 요청 전송
      */
     private void sendMatchingRequest(MatchingQueue queue, Gender gender) {
         MatchingQueueMessage message = new MatchingQueueMessage(
@@ -116,15 +114,19 @@ public class MatchingService {
                 gender,
                 queue.getMatchingType()
         );
-        jmsTemplate.convertAndSend(MATCHING_QUEUE, message);
-        log.debug("Sent matching request to ActiveMQ: {}", message);
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.MATCHING_EXCHANGE,
+                RabbitMQConfig.MATCHING_ROUTING_KEY,
+                message
+        );
+        log.debug("Sent matching request to RabbitMQ: {}", message);
     }
 
     /**
-     * ActiveMQ 리스너 - 매칭 처리
+     * RabbitMQ 리스너 - 매칭 처리
      * 트랜잭션 격리 수준: SERIALIZABLE - 동시 매칭 방지
      */
-    @JmsListener(destination = MATCHING_QUEUE)
+    @RabbitListener(queues = RabbitMQConfig.MATCHING_QUEUE)
     @Transactional(isolation = Isolation.SERIALIZABLE, propagation = Propagation.REQUIRED)
     public void processMatchingRequest(MatchingQueueMessage message) {
         log.info("Processing matching request for queue {}", message.getQueueId());

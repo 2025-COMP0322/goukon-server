@@ -1,12 +1,15 @@
 package com.kr.goukon.presentation.group;
 
 import com.kr.goukon.application.group.GroupService;
+import com.kr.goukon.application.invite.InviteCodeService;
 import com.kr.goukon.domain.group.Group;
 import com.kr.goukon.domain.student.Student;
 import com.kr.goukon.global.annotation.AuthUser;
 import com.kr.goukon.presentation.group.dto.request.AddMemberRequest;
+import com.kr.goukon.presentation.group.dto.request.JoinByCodeRequest;
 import com.kr.goukon.presentation.group.dto.response.GroupDetailResponse;
 import com.kr.goukon.presentation.group.dto.response.GroupResponse;
+import com.kr.goukon.presentation.group.dto.response.InviteCodeResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +25,7 @@ import java.util.stream.Collectors;
 public class GroupController {
 
     private final GroupService groupService;
+    private final InviteCodeService inviteCodeService;
 
     /**
      * 그룹 생성
@@ -99,5 +103,41 @@ public class GroupController {
             @PathVariable Long groupId) {
         groupService.deleteGroup(groupId, studentId);
         return ResponseEntity.noContent().build();
+    }
+
+    // ==================== 초대 코드 API ====================
+
+    /**
+     * 초대 코드 생성
+     */
+    @PostMapping("/{groupId}/invite")
+    public ResponseEntity<InviteCodeResponse> generateInviteCode(
+            @AuthUser Long studentId,
+            @PathVariable Long groupId) {
+        String code = inviteCodeService.generateInviteCode(groupId, studentId);
+        InviteCodeService.InviteCodeInfo info = inviteCodeService.getInviteCodeInfo(code);
+        return ResponseEntity.ok(new InviteCodeResponse(code, groupId, info.remainingSeconds()));
+    }
+
+    /**
+     * 초대 코드로 그룹 참가
+     */
+    @PostMapping("/join")
+    public ResponseEntity<GroupResponse> joinByCode(
+            @AuthUser Long studentId,
+            @Valid @RequestBody JoinByCodeRequest request) {
+        Long groupId = inviteCodeService.validateInviteCode(request.code());
+        groupService.addMember(groupId, studentId, studentId);
+        Group group = groupService.getGroup(groupId);
+        return ResponseEntity.ok(GroupResponse.from(group));
+    }
+
+    /**
+     * 초대 코드 유효성 검증
+     */
+    @GetMapping("/invite/{code}")
+    public ResponseEntity<InviteCodeResponse> validateInviteCode(@PathVariable String code) {
+        InviteCodeService.InviteCodeInfo info = inviteCodeService.getInviteCodeInfo(code);
+        return ResponseEntity.ok(new InviteCodeResponse(code, info.groupId(), info.remainingSeconds()));
     }
 }

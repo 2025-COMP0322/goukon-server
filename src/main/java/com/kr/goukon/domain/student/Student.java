@@ -30,11 +30,11 @@ public class Student extends BaseEntity {
     @Column(name = "student_number", length = 20, nullable = false, unique = true)
     private String studentNumber;
 
-    @Column(nullable = false)
-    private int age;
+    @Column
+    private Integer age;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 1)
+    @Column(length = 1)
     private Gender gender;
 
     @Column(nullable = false, length = 50)
@@ -47,7 +47,7 @@ public class Student extends BaseEntity {
     @Lob
     private String profile;
 
-    @Column(nullable = false, length = 100)
+    @Column(length = 100)
     private String department;
 
     // 인증용 필드 (Member에서 통합)
@@ -62,7 +62,7 @@ public class Student extends BaseEntity {
     private Role role = Role.USER;
 
     @Builder
-    public Student(String studentNumber, int age, Gender gender, String name, Mbti mbti,
+    public Student(String studentNumber, Integer age, Gender gender, String name, Mbti mbti,
                    String profile, String department, String email, String password, Role role) {
         this.studentNumber = studentNumber;
         this.age = age;
@@ -96,10 +96,17 @@ public class Student extends BaseEntity {
     }
 
     // 프로필 정보 업데이트
-    public void updateProfile(String name, Mbti mbti, String profile, String department) {
+    public void updateProfile(String name, Mbti mbti, String profile, String department, Integer age, Gender gender) {
         if (name != null) this.name = name;
         if (mbti != null) this.mbti = mbti;
         if (profile != null) this.profile = profile;
         if (department != null) this.department = department;
+        if (age != null) this.age = age;
+        if (gender != null) this.gender = gender;
+    }
+
+    // 프로필 완료 여부 체크 (필수: age, gender, department)
+    public boolean isProfileComplete() {
+        return this.age != null && this.gender != null && this.department != null;
     }
 }

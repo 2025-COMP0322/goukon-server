@@ -5,6 +5,7 @@ import com.kr.goukon.global.annotation.AuthUser;
 import com.kr.goukon.presentation.auth.dto.request.LoginRequest;
 import com.kr.goukon.presentation.auth.dto.request.PasswordResetRequest;
 import com.kr.goukon.presentation.auth.dto.request.SignUpRequest;
+import com.kr.goukon.presentation.auth.dto.response.CheckDuplicate200Response;
 import com.kr.goukon.presentation.auth.dto.response.Login200Response;
 import com.kr.goukon.presentation.auth.dto.response.PasswordReset200Response;
 import com.kr.goukon.presentation.auth.dto.response.SignUp201Response;
@@ -35,5 +36,17 @@ public class AuthController {
     public ResponseEntity<PasswordReset200Response> passwordReset(@AuthUser Long studentId, @Valid @RequestBody PasswordResetRequest request){
         return ResponseEntity.ok()
                 .body(authService.passwordReset(studentId, request));
+    }
+
+    @GetMapping("/check-email")
+    public ResponseEntity<CheckDuplicate200Response> checkEmail(@RequestParam String email) {
+        boolean exists = authService.checkEmailExists(email);
+        return ResponseEntity.ok(new CheckDuplicate200Response(exists));
+    }
+
+    @GetMapping("/check-student-number")
+    public ResponseEntity<CheckDuplicate200Response> checkStudentNumber(@RequestParam String studentNumber) {
+        boolean exists = authService.checkStudentNumberExists(studentNumber);
+        return ResponseEntity.ok(new CheckDuplicate200Response(exists));
     }
 }
