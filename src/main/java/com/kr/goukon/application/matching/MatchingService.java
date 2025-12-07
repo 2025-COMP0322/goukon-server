@@ -12,10 +12,14 @@ import com.kr.goukon.domain.matchingqueue.MatchingType;
 import com.kr.goukon.domain.matchingqueue.repository.MatchingQueueRepository;
 import com.kr.goukon.domain.matchingsession.MatchingSession;
 import com.kr.goukon.domain.matchingsession.repository.MatchingSessionRepository;
+import com.kr.goukon.domain.sessionendvote.SessionEndVote;
+import com.kr.goukon.domain.sessionendvote.repository.SessionEndVoteRepository;
 import com.kr.goukon.domain.sessionmatches.SessionMatches;
 import com.kr.goukon.domain.sessionmatches.repository.SessionMatchesRepository;
 import com.kr.goukon.domain.student.Gender;
 import com.kr.goukon.domain.student.Student;
+import com.kr.goukon.domain.student.repository.StudentRepository;
+import com.kr.goukon.domain.studentgroup.StudentGroup;
 import com.kr.goukon.domain.studentgroup.repository.StudentGroupRepository;
 import com.kr.goukon.global.exception.BusinessException;
 import com.kr.goukon.global.exception.ErrorCode;
@@ -41,9 +45,11 @@ public class MatchingService {
     private final MatchingQueueRepository matchingQueueRepository;
     private final MatchingSessionRepository matchingSessionRepository;
     private final SessionMatchesRepository sessionMatchesRepository;
+    private final SessionEndVoteRepository sessionEndVoteRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final GroupRepository groupRepository;
     private final StudentGroupRepository studentGroupRepository;
+    private final StudentRepository studentRepository;
     private final RabbitTemplate rabbitTemplate;
 
     /**
@@ -217,10 +223,10 @@ public class MatchingService {
     }
 
     /**
-     * 학생이 참여한 매칭 세션 목록 조회
+     * 학생이 참여한 활성 매칭 세션 목록 조회
      */
     public List<SessionMatches> getStudentSessions(Long studentId) {
-        return sessionMatchesRepository.findByStudentId(studentId);
+        return sessionMatchesRepository.findActiveByStudentId(studentId);
     }
 
     /**
@@ -281,5 +287,139 @@ public class MatchingService {
             List<Student> myMembers,
             Group opponentGroup,
             List<Student> opponentMembers
+    ) {}
+
+    /**
+     * 세션 종료 투표
+     * 트랜잭션 격리 수준: SERIALIZABLE - 동시 투표로 인한 race condition 방지
+     * @return 세션이 종료되었는지 여부
+     */
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public EndVoteResult voteEndSession(Long sessionId, Long studentId) {
+        // 세션 조회 (비관적 락)
+        MatchingSession session = matchingSessionRepository.findByIdWithLock(sessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MATCHING_SESSION_NOT_FOUND));
+
+        // 이미 종료된 세션인지 확인
+        if (!session.isActive()) {
+            throw new BusinessException(ErrorCode.SESSION_ALREADY_ENDED);
+        }
+
+        // 학생이 세션 멤버인지 확인
+        List<SessionMatches> matches = sessionMatchesRepository.findBySessionId(sessionId);
+        Group voterGroup = findVoterGroup(matches, studentId);
+
+        if (voterGroup == null) {
+            throw new BusinessException(ErrorCode.NOT_SESSION_MEMBER);
+        }
+
+        // 이미 투표했는지 확인
+        if (sessionEndVoteRepository.existsByIdSessionIdAndIdStudentId(sessionId, studentId)) {
+            throw new BusinessException(ErrorCode.ALREADY_VOTED_END);
+        }
+
+        // 투표 등록
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STUDENT_NOT_FOUND));
+        SessionEndVote vote = SessionEndVote.create(session, student);
+        sessionEndVoteRepository.save(vote);
+
+        log.info("Student {} voted to end session {}", studentId, sessionId);
+
+        // 그룹 전원 투표 확인
+        long groupMemberCount = studentGroupRepository.countByGroupId(voterGroup.getId());
+        long groupVoteCount = sessionEndVoteRepository.countBySessionIdAndGroupId(sessionId, voterGroup.getId());
+
+        boolean sessionEnded = false;
+        if (groupVoteCount >= groupMemberCount) {
+            // 만장일치 → 세션 종료
+            session.complete();
+
+            // 그룹 상태 복원 (다시 매칭 가능하도록)
+            for (SessionMatches match : matches) {
+                match.getGroup().resetToAvailable();
+            }
+
+            sessionEnded = true;
+            log.info("Session {} ended by unanimous vote from group {}", sessionId, voterGroup.getId());
+        }
+
+        return new EndVoteResult(
+                sessionEnded,
+                (int) groupVoteCount,
+                (int) groupMemberCount
+        );
+    }
+
+    /**
+     * 세션 종료 투표 상태 조회
+     */
+    public EndVoteStatus getEndVoteStatus(Long sessionId, Long studentId) {
+        // 세션 조회
+        MatchingSession session = matchingSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MATCHING_SESSION_NOT_FOUND));
+
+        // 학생이 세션 멤버인지 확인
+        List<SessionMatches> matches = sessionMatchesRepository.findBySessionId(sessionId);
+        Group myGroup = findVoterGroup(matches, studentId);
+
+        if (myGroup == null) {
+            throw new BusinessException(ErrorCode.NOT_SESSION_MEMBER);
+        }
+
+        // 내 그룹의 투표 현황
+        long myGroupMemberCount = studentGroupRepository.countByGroupId(myGroup.getId());
+        long myGroupVoteCount = sessionEndVoteRepository.countBySessionIdAndGroupId(sessionId, myGroup.getId());
+
+        // 내가 투표했는지
+        boolean hasVoted = sessionEndVoteRepository.existsByIdSessionIdAndIdStudentId(sessionId, studentId);
+
+        // 투표한 멤버 목록
+        List<Long> votedStudentIds = sessionEndVoteRepository.findStudentIdsBySessionId(sessionId);
+        List<Long> myGroupVotedIds = studentGroupRepository.findByGroupId(myGroup.getId())
+                .stream()
+                .map(sg -> sg.getStudent().getId())
+                .filter(votedStudentIds::contains)
+                .collect(Collectors.toList());
+
+        return new EndVoteStatus(
+                session.isActive(),
+                hasVoted,
+                (int) myGroupVoteCount,
+                (int) myGroupMemberCount,
+                myGroupVotedIds
+        );
+    }
+
+    /**
+     * 학생이 속한 그룹 찾기
+     */
+    private Group findVoterGroup(List<SessionMatches> matches, Long studentId) {
+        for (SessionMatches match : matches) {
+            if (studentGroupRepository.existsByStudentIdAndGroupId(studentId, match.getGroup().getId())) {
+                return match.getGroup();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 종료 투표 결과 DTO
+     */
+    public record EndVoteResult(
+            boolean sessionEnded,
+            int currentVotes,
+            int requiredVotes
+    ) {}
+
+    /**
+     * 종료 투표 상태 DTO
+     */
+    public record EndVoteStatus(
+            boolean isActive,
+            boolean hasVoted,
+            int currentVotes,
+            int requiredVotes,
+            List<Long> votedMemberIds
     ) {}
 }

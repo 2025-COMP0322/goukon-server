@@ -8,6 +8,8 @@ import com.kr.goukon.global.annotation.AuthUser;
 import com.kr.goukon.global.exception.BusinessException;
 import com.kr.goukon.global.exception.ErrorCode;
 import com.kr.goukon.presentation.matching.dto.request.RegisterQueueRequest;
+import com.kr.goukon.presentation.matching.dto.response.EndVoteResponse;
+import com.kr.goukon.presentation.matching.dto.response.EndVoteStatusResponse;
 import com.kr.goukon.presentation.matching.dto.response.MatchingQueueResponse;
 import com.kr.goukon.presentation.matching.dto.response.SessionDetailResponse;
 import com.kr.goukon.presentation.matching.dto.response.SessionMatchResponse;
@@ -88,5 +90,27 @@ public class MatchingController {
         GroupDetailResponse opponentGroupResponse = GroupDetailResponse.from(data.opponentGroup(), data.opponentMembers());
 
         return ResponseEntity.ok(SessionDetailResponse.of(sessionId, myGroupResponse, opponentGroupResponse));
+    }
+
+    /**
+     * 세션 종료 투표
+     */
+    @PostMapping("/sessions/{sessionId}/end-vote")
+    public ResponseEntity<EndVoteResponse> voteEndSession(
+            @PathVariable Long sessionId,
+            @AuthUser Long studentId) {
+        MatchingService.EndVoteResult result = matchingService.voteEndSession(sessionId, studentId);
+        return ResponseEntity.ok(EndVoteResponse.from(result));
+    }
+
+    /**
+     * 세션 종료 투표 상태 조회
+     */
+    @GetMapping("/sessions/{sessionId}/end-vote")
+    public ResponseEntity<EndVoteStatusResponse> getEndVoteStatus(
+            @PathVariable Long sessionId,
+            @AuthUser Long studentId) {
+        MatchingService.EndVoteStatus status = matchingService.getEndVoteStatus(sessionId, studentId);
+        return ResponseEntity.ok(EndVoteStatusResponse.from(status));
     }
 }

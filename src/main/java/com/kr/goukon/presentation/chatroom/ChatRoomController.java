@@ -4,6 +4,7 @@ import com.kr.goukon.application.chat.ChatService;
 import com.kr.goukon.domain.chatroom.ChatRoom;
 import com.kr.goukon.domain.message.Message;
 import com.kr.goukon.global.annotation.AuthUser;
+import com.kr.goukon.presentation.chatroom.dto.request.SendMessageRequest;
 import com.kr.goukon.presentation.chatroom.dto.response.ChatRoomResponse;
 import com.kr.goukon.presentation.chatroom.dto.response.MessageResponse;
 import lombok.RequiredArgsConstructor;
@@ -78,8 +79,8 @@ public class ChatRoomController {
     public ResponseEntity<MessageResponse> sendMessage(
             @AuthUser Long studentId,
             @PathVariable Long sessionId,
-            @RequestBody String content) {
-        Message message = chatService.saveMessage(sessionId, studentId, content);
+            @RequestBody SendMessageRequest request) {
+        Message message = chatService.saveMessage(sessionId, studentId, request.content());
         return ResponseEntity.ok(MessageResponse.from(message));
     }
 }

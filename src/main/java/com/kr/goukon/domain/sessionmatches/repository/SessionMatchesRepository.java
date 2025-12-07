@@ -28,4 +28,10 @@ public interface SessionMatchesRepository extends JpaRepository<SessionMatches, 
     @Query("SELECT sm FROM SessionMatches sm JOIN FETCH sm.session " +
            "WHERE sm.group.id IN (SELECT sg.group.id FROM StudentGroup sg WHERE sg.student.id = :studentId)")
     List<SessionMatches> findByStudentId(@Param("studentId") Long studentId);
+
+    // 학생이 참여한 활성 세션만 조회
+    @Query("SELECT sm FROM SessionMatches sm JOIN FETCH sm.session " +
+           "WHERE sm.session.status = 'ACTIVE' " +
+           "AND sm.group.id IN (SELECT sg.group.id FROM StudentGroup sg WHERE sg.student.id = :studentId)")
+    List<SessionMatches> findActiveByStudentId(@Param("studentId") Long studentId);
 }

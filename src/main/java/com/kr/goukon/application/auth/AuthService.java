@@ -48,8 +48,15 @@ public class AuthService {
     }
 
     public Login200Response login(LoginRequest request) {
-        Student student = studentRepository.findByEmail(request.email())
-                .orElseThrow(() -> new BusinessException(NO_USER));
+        // 이메일 또는 학번으로 사용자 조회
+        Student student;
+        if (request.isEmail()) {
+            student = studentRepository.findByEmail(request.identifier())
+                    .orElseThrow(() -> new BusinessException(NO_USER));
+        } else {
+            student = studentRepository.findByStudentNumber(request.identifier())
+                    .orElseThrow(() -> new BusinessException(NO_USER));
+        }
 
         if (!student.matchPassword(request.password(), passwordEncoder)) {
             throw new BusinessException(WRONG_PASSWORD);
