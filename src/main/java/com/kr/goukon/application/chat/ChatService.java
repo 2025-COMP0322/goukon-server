@@ -34,11 +34,13 @@ public class ChatService {
     private final StudentRepository studentRepository;
     private final SessionMatchesRepository sessionMatchesRepository;
     private final StudentGroupRepository studentGroupRepository;
+    private final ChatMessageBuffer chatMessageBuffer;
 
     /**
      * 실시간 메시지 전송 (WebSocket)
      */
     public void sendMessage(ChatMessage message) {
+        chatMessageBuffer.save(message);
         String destination = "/topic/chatroom/" + message.roomId();
         messagingTemplate.convertAndSend(destination, message);
         log.info("Sent message to {}: {}", destination, message.content());
@@ -48,6 +50,7 @@ public class ChatService {
      * 채팅방 입장 처리 (WebSocket)
      */
     public void handleEnter(ChatMessage message) {
+        chatMessageBuffer.save(message);
         ChatMessage enterMessage = ChatMessage.enter(message.roomId(), message.senderName());
         messagingTemplate.convertAndSend("/topic/chatroom/" + message.roomId(), enterMessage);
     }
@@ -56,6 +59,7 @@ public class ChatService {
      * 채팅방 퇴장 처리 (WebSocket)
      */
     public void handleLeave(ChatMessage message) {
+        chatMessageBuffer.save(message);
         ChatMessage leaveMessage = ChatMessage.leave(message.roomId(), message.senderName());
         messagingTemplate.convertAndSend("/topic/chatroom/" + message.roomId(), leaveMessage);
     }
