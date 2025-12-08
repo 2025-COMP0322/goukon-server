@@ -12,7 +12,7 @@
 | GroupService | addMember | **SERIALIZABLE** | 그룹 인원 제한(3명) 검증 필요 |
 | GroupService | removeMember | READ_COMMITTED (기본) | 단순 DELETE |
 | GroupService | deleteGroup | READ_COMMITTED (기본) | 비관적 락으로 충분 |
-| MatchingService | registerQueue | **SERIALIZABLE** | 중복 등록 방지 + 상태 변경 원자성 |
+| MatchingService | registerQueue | READ_COMMITTED (기본) | 비관적 락으로 중복 등록 방지 + ORA-08177 회피 |
 | MatchingService | processMatchingRequest | **SERIALIZABLE** | 동시 매칭 시 race condition 방지 |
 | MatchingService | voteEndSession | **SERIALIZABLE** | 만장일치 투표 카운팅 정확성 |
 | ChatService | saveMessage | READ_COMMITTED (기본) | 메시지 순서는 createdAt으로 관리 |
@@ -36,17 +36,30 @@ public void addMember(Long groupId, Long studentId, Long requesterId) {
 
 ```java
 // 2. 매칭 대기열 등록
-@Transactional(isolation = Isolation.SERIALIZABLE)
+@Transactional
 public MatchingQueue registerQueue(Long groupId, MatchingType matchingType) {
-    Group group = groupRepository.findByIdWithLock(groupId);
-    if (matchingQueueRepository.existsByGroupId(groupId)) {
-        throw new BusinessException(ErrorCode.ALREADY_IN_QUEUE);
+    Group group = groupRepository.findByIdWithLock(groupId); // 비관적 락으로 행 단위 보호
+
+    MatchingQueue existingQueue = matchingQueueRepository.findByGroupId(groupId)
+            .orElse(null);
+    if (existingQueue != null) {
+        if (existingQueue.isWaiting()) {
+            throw new BusinessException(ErrorCode.ALREADY_IN_QUEUE);
+        }
+        existingQueue.requeue(matchingType);
+        group.startQueuing();
+        return existingQueue;
     }
-    // ... 큐 등록 및 상태 변경
+
+    if (!group.isAvailable()) {
+        throw new BusinessException(ErrorCode.GROUP_NOT_AVAILABLE);
+    }
+
+    // ... 신규 큐 생성 및 상태 변경
 }
 ```
 
-**이유**: 중복 등록 방지 + 그룹 상태 변경의 원자성 보장.
+**이유**: 비관적 락과 재큐잉 로직으로 중복 등록을 막으면서, SERIALIZABLE 격리에서 발생한 ORA-08177(직렬화 충돌)을 제거.
 
 ```java
 // 3. 매칭 처리
@@ -201,6 +214,17 @@ private String generateUniqueCode() {
 }
 ```
 
+### 2.3 Redis 기반 채팅 버퍼
+
+| 요소 | 구현 | 동시성/무결성 포인트 |
+|------|------|---------------------|
+| 버퍼 저장 | WebSocket 수신 시 `ChatMessageBuffer.save()` → `chat:session:{sessionId}` 리스트에 push | 방 단위 키로 분리해 경합 최소화 |
+| Flush 트리거 | (1) 방별 10개 이상 적재, (2) REST 조회 진입 직전, (3) `@Scheduled` 주기(기본 5초) | 조회 시점에 DB와 Redis 상태 일치 보장, 일정 주기로 미조회 방도 동기화 |
+| Flush 트랜잭션 | `TransactionTemplate` + `PROPAGATION_REQUIRES_NEW` | Redis→DB 반영이 기존 트랜잭션과 분리되어 메시지 손실 방지 |
+| 무결성 검사 | flush 시 `MessageType.CHAT` & `senderId` 유효성 검증 후 `saveMessage` 재사용 | 비정상 메시지 필터링, DB 제약 오류는 로그 후 건너뜀 |
+
+**효과**: 실시간 채팅에서 다수 사용자가 동시에 메시지를 전송해도 Redis가 완충하고, 임계치·조회·주기 flush가 곧바로 DB에 반영해 데이터 일관성을 유지한다.
+
 ---
 
 ## 3. RabbitMQ 사용
@@ -238,7 +262,7 @@ public class MatchingQueueMessage {
 ### 3.2 Producer (매칭 등록)
 
 ```java
-@Transactional(isolation = Isolation.SERIALIZABLE)
+@Transactional
 public MatchingQueue registerQueue(Long groupId, MatchingType matchingType) {
     // 1. DB에 큐 등록
     MatchingQueue queue = MatchingQueue.create(group, matchingType);
@@ -358,3 +382,17 @@ public MatchingQueue registerQueue(...) {
 - SERIALIZABLE 격리수준: 인원 제한, 만장일치 투표 등 집계 연산
 - Redis 원자적 연산: 초대 코드 생성
 - RabbitMQ 순차 처리: 매칭 요청 순서 보장
+
+---
+
+## 6. DB 수업 프로젝트 동시성 요구사항 대응
+
+| 요구사항 | 구현 위치 | 제어 기법 | 설명 |
+|----------|-----------|-----------|------|
+| 여러 사용자의 동시 그룹 참여 | `GroupService.addMember` | SERIALIZABLE + 비관적 락 | 동시에 참여해도 인원 제한(3명)을 넘지 않도록 트랜잭션으로 보호 |
+| 매칭 대기열 중복/경합 방지 | `MatchingService.registerQueue`, `processMatchingRequest` | 비관적 락 + (필요 구간) SERIALIZABLE | 동일 그룹·큐가 두 번 등록/매칭되는 race condition 차단 |
+| 세션 종료 투표 일관성 | `MatchingService.voteEndSession` | SERIALIZABLE + 카운트 검증 | 만장일치 여부를 정확히 계산, 동시 투표 시 중복 허용 안함 |
+| 채팅 실시간 쓰기/조회 | `ChatService` + Redis 버퍼 | 방별 임계치 + 조회/주기 flush | WebSocket 폭주 상황에서도 메시지가 순서/무결성을 유지하며 DB에 적재 |
+| 초대 코드 중복 생성 방지 | `InviteCodeService` | Redis 원자연산 + TTL | 다수 사용자가 동시에 코드 생성해도 중복 없음, 자동 만료로 무결성 유지 |
+
+이와 같이 서비스 전반에서 트랜잭션 격리 수준, 비관적 락, Redis 버퍼링, 메시지 큐 등을 적절히 조합해 동시성 실패로 인한 데이터 일관성·무결성 오류를 방지하고 있으며, DB 수업 평가 항목(동시 접속, concurrency control 지원)에 부합하도록 설계/구현했다.
