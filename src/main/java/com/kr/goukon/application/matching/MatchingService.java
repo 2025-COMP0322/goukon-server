@@ -52,7 +52,7 @@ public class MatchingService {
     private final StudentRepository studentRepository;
     private final RabbitTemplate rabbitTemplate;
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional
     public MatchingQueue registerQueue(Long groupId, MatchingType matchingType) {
         // 그룹 존재 확인 및 비관적 락
         Group group = groupRepository.findByIdWithLock(groupId)
