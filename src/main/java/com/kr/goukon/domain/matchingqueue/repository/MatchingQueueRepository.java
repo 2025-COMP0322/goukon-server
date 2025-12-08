@@ -31,7 +31,7 @@ public interface MatchingQueueRepository extends JpaRepository<MatchingQueue, Lo
     // 대기중인 큐에서 특정 성별, 매칭 타입으로 조회 (매칭용)
     @Query("SELECT mq FROM MatchingQueue mq JOIN FETCH mq.group g " +
            "WHERE mq.matchingStatus = :status AND mq.matchingType = :type AND g.gender = :gender " +
-           "ORDER BY mq.createdAt ASC")
+           "ORDER BY mq.queuedAt ASC")
     List<MatchingQueue> findWaitingQueuesByGenderAndType(
             @Param("status") MatchingStatus status,
             @Param("gender") Gender gender,
@@ -46,7 +46,7 @@ public interface MatchingQueueRepository extends JpaRepository<MatchingQueue, Lo
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT mq FROM MatchingQueue mq JOIN FETCH mq.group g " +
            "WHERE mq.matchingStatus = 'WAITING' AND mq.matchingType = :type AND g.gender = :gender " +
-           "ORDER BY mq.createdAt ASC")
+           "ORDER BY mq.queuedAt ASC")
     List<MatchingQueue> findWaitingQueuesWithLock(
             @Param("gender") Gender gender,
             @Param("type") MatchingType type);
