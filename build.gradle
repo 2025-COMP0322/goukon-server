@@ -6,11 +6,11 @@ plugins {
 
 group = 'com.kr'
 version = '0.0.1-SNAPSHOT'
-description = 'KNU-CAMPUS-SERVER'
+description = 'goukon-server'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -60,8 +60,17 @@ dependencies {
     implementation 'org.springframework:spring-websocket'
     implementation 'org.springframework:spring-messaging'
 
-    // *  Oracle
+    // * Oracle
     implementation 'com.oracle.database.jdbc:ojdbc11:23.2.0.0'
+
+    // * RabbitMQ (AMQP) - Message Queue
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
+    // * Redis/Valkey - Invite Code Storage
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // * Actuator - Health Check
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
 }
 

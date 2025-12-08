@@ -1,10 +1,10 @@
-# KNU-Campus FrontEnd
+# goukon-server
 
 <br />
 
-## 📖 KNU-Campus Repository
+## 📖 goukon-server Repository
 
-[BackEnd Repository](https://github.com/2025-COMP0322/KNU-CAMPUS)
+[BackEnd Repository](https://github.com/2025-COMP0322/goukon-server)
 
 <br />
 

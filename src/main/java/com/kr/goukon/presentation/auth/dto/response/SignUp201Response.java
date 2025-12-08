@@ -1,0 +1,25 @@
+package com.kr.goukon.presentation.auth.dto.response;
+
+import com.kr.goukon.domain.student.Student;
+
+public record SignUp201Response(
+        Long id,
+        String studentNumber,
+        String name,
+        String email,
+        String gender,
+        String department,
+        String mbti
+) {
+    public static SignUp201Response of(Student student) {
+        return new SignUp201Response(
+                student.getId(),
+                student.getStudentNumber(),
+                student.getName(),
+                student.getEmail(),
+                student.getGender() != null ? student.getGender().name() : null,
+                student.getDepartment(),
+                student.getMbti() != null ? student.getMbti().name() : null
+        );
+    }
+}
