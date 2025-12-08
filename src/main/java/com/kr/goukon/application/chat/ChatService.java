@@ -12,6 +12,7 @@ import com.kr.goukon.domain.studentgroup.repository.StudentGroupRepository;
 import com.kr.goukon.global.exception.BusinessException;
 import com.kr.goukon.global.exception.ErrorCode;
 import com.kr.goukon.presentation.chat.dto.ChatMessage;
+import com.kr.goukon.presentation.chat.dto.MessageType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 
@@ -28,6 +32,8 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class ChatService {
 
+    private static final int BUFFER_FLUSH_THRESHOLD = 10;
+
     private final SimpMessagingTemplate messagingTemplate;
     private final ChatRoomRepository chatRoomRepository;
     private final MessageRepository messageRepository;
@@ -35,6 +41,7 @@ public class ChatService {
     private final SessionMatchesRepository sessionMatchesRepository;
     private final StudentGroupRepository studentGroupRepository;
     private final ChatMessageBuffer chatMessageBuffer;
+    private final PlatformTransactionManager transactionManager;
 
     /**
      * 실시간 메시지 전송 (WebSocket)
@@ -44,6 +51,7 @@ public class ChatService {
         String destination = "/topic/chatroom/" + message.roomId();
         messagingTemplate.convertAndSend(destination, message);
         log.info("Sent message to {}: {}", destination, message.content());
+        flushBufferedMessagesIfNeeded(message.roomId());
     }
 
     /**
@@ -51,7 +59,7 @@ public class ChatService {
      */
     public void handleEnter(ChatMessage message) {
         chatMessageBuffer.save(message);
-        ChatMessage enterMessage = ChatMessage.enter(message.roomId(), message.senderName());
+        ChatMessage enterMessage = ChatMessage.enter(message.roomId(), message.senderId(), message.senderName());
         messagingTemplate.convertAndSend("/topic/chatroom/" + message.roomId(), enterMessage);
     }
 
@@ -60,7 +68,7 @@ public class ChatService {
      */
     public void handleLeave(ChatMessage message) {
         chatMessageBuffer.save(message);
-        ChatMessage leaveMessage = ChatMessage.leave(message.roomId(), message.senderName());
+        ChatMessage leaveMessage = ChatMessage.leave(message.roomId(), message.senderId(), message.senderName());
         messagingTemplate.convertAndSend("/topic/chatroom/" + message.roomId(), leaveMessage);
     }
 
@@ -111,6 +119,7 @@ public class ChatService {
      * 채팅방 메시지 목록 조회
      */
     public List<Message> getChatMessages(Long sessionId, Long requesterId) {
+        flushBufferedMessages(sessionId);
         // 채팅방 존재 확인
         if (!chatRoomRepository.existsById(sessionId)) {
             throw new BusinessException(ErrorCode.CHATROOM_NOT_FOUND);
@@ -128,6 +137,7 @@ public class ChatService {
      * 채팅방 메시지 목록 조회 (페이징)
      */
     public Page<Message> getChatMessagesWithPaging(Long sessionId, Long requesterId, Pageable pageable) {
+        flushBufferedMessages(sessionId);
         // 채팅방 존재 확인
         if (!chatRoomRepository.existsById(sessionId)) {
             throw new BusinessException(ErrorCode.CHATROOM_NOT_FOUND);
@@ -159,6 +169,53 @@ public class ChatService {
      * 채팅방의 마지막 메시지 조회
      */
     public Message getLastMessage(Long sessionId) {
+        flushBufferedMessages(sessionId);
         return messageRepository.findLastMessageByChatRoomId(sessionId).orElse(null);
+    }
+
+    private void flushBufferedMessagesIfNeeded(Long sessionId) {
+        if (sessionId == null) {
+            return;
+        }
+        long bufferSize = chatMessageBuffer.size(sessionId);
+        if (bufferSize >= BUFFER_FLUSH_THRESHOLD) {
+            flushBufferedMessages(sessionId);
+        }
+    }
+
+    public void flushBufferedMessages(Long sessionId) {
+        if (sessionId == null) {
+            return;
+        }
+        List<ChatMessage> bufferedMessages = chatMessageBuffer.popAll(sessionId);
+        if (bufferedMessages.isEmpty()) {
+            return;
+        }
+
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        template.setReadOnly(false);
+        template.executeWithoutResult(status -> persistBufferedMessages(bufferedMessages));
+    }
+
+    private void persistBufferedMessages(List<ChatMessage> bufferedMessages) {
+        for (ChatMessage bufferedMessage : bufferedMessages) {
+            if (bufferedMessage.type() != MessageType.CHAT) {
+                continue;
+            }
+
+            Long senderId = bufferedMessage.senderId();
+            if (senderId == null) {
+                log.warn("Skip buffered chat message without senderId: session={}", bufferedMessage.roomId());
+                continue;
+            }
+
+            try {
+                saveMessage(bufferedMessage.roomId(), senderId, bufferedMessage.content());
+            } catch (BusinessException e) {
+                log.warn("Failed to persist buffered message: session={}, sender={}, reason={}",
+                        bufferedMessage.roomId(), senderId, e.getErrorMessage());
+            }
+        }
     }
 }
