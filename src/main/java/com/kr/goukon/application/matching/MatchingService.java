@@ -58,19 +58,30 @@ public class MatchingService {
         Group group = groupRepository.findByIdWithLock(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
+        // 그룹 인원 확인
+        long memberCount = studentGroupRepository.countByGroupId(groupId);
+        validateMemberCount(memberCount, matchingType);
+
+        MatchingQueue existingQueue = matchingQueueRepository.findByGroupId(groupId)
+                .orElse(null);
+
+        if (existingQueue != null) {
+            if (existingQueue.isWaiting()) {
+                throw new BusinessException(ErrorCode.ALREADY_IN_QUEUE);
+            }
+
+            existingQueue.requeue(matchingType);
+            group.startQueuing();
+            sendMatchingRequest(existingQueue, group.getGender());
+
+            log.info("Group {} re-registered to matching queue with type {}", groupId, matchingType);
+            return existingQueue;
+        }
+
         // 그룹 상태 확인
         if (!group.isAvailable()) {
             throw new BusinessException(ErrorCode.GROUP_NOT_AVAILABLE);
         }
-
-        // 이미 대기열에 있는지 확인
-        if (matchingQueueRepository.existsByGroupId(groupId)) {
-            throw new BusinessException(ErrorCode.ALREADY_IN_QUEUE);
-        }
-
-        // 그룹 인원 확인
-        long memberCount = studentGroupRepository.countByGroupId(groupId);
-        validateMemberCount(memberCount, matchingType);
 
         // 대기열 등록
         MatchingQueue queue = MatchingQueue.create(group, matchingType);

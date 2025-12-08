@@ -49,10 +49,14 @@ public class MatchingQueue {
     @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "queued_at", nullable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    private LocalDateTime queuedAt;
+
     private MatchingQueue(Group group, MatchingType matchingType) {
         this.group = group;
         this.matchingStatus = MatchingStatus.WAITING;
         this.matchingType = matchingType;
+        this.queuedAt = LocalDateTime.now();
     }
 
     public static MatchingQueue create(Group group, MatchingType matchingType) {
@@ -69,5 +73,11 @@ public class MatchingQueue {
 
     public boolean isWaiting() {
         return this.matchingStatus == MatchingStatus.WAITING;
+    }
+
+    public void requeue(MatchingType matchingType) {
+        this.matchingType = matchingType;
+        this.matchingStatus = MatchingStatus.WAITING;
+        this.queuedAt = LocalDateTime.now();
     }
 }
