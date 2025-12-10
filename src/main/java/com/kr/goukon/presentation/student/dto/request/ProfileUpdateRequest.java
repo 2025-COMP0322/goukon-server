@@ -1,5 +1,6 @@
 package com.kr.goukon.presentation.student.dto.request;
 
+import com.kr.goukon.domain.student.Gender;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
@@ -8,5 +9,6 @@ public record ProfileUpdateRequest(
         String mbti,
         String profile,
         String department,
-        @Min(18) @Max(30) Integer age
+        @Min(18) @Max(30) Integer age,
+        Gender gender
 ) {}

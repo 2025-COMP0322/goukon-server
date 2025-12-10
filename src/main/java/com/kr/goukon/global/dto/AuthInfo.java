@@ -11,9 +11,12 @@ public record AuthInfo(
     private final static String tokenRoleKey = "role";
 
     public static AuthInfo from(Jws<Claims> jws) {
+        Object roleValue = jws.getPayload().get(tokenRoleKey);
+        Role role = (roleValue != null) ? Role.convert(roleValue.toString()) : Role.USER;
+
         return new AuthInfo(
                 Long.parseLong(jws.getPayload().getSubject()),
-                Role.convert(jws.getPayload().get(tokenRoleKey).toString())
+                role
         );
     }
 }

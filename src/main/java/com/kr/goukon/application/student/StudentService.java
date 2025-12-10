@@ -1,5 +1,6 @@
 package com.kr.goukon.application.student;
 
+import com.kr.goukon.domain.student.Gender;
 import com.kr.goukon.domain.student.Mbti;
 import com.kr.goukon.domain.student.Student;
 import com.kr.goukon.domain.student.repository.StudentRepository;
@@ -49,7 +50,7 @@ public class StudentService {
      * 프로필 정보 업데이트
      */
     public Student updateProfile(Long studentId, String name, String mbtiStr, String profile,
-                                 String department, Integer age) {
+                                 String department, Integer age, Gender gender) {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDENT_NOT_FOUND));
 
@@ -60,7 +61,8 @@ public class StudentService {
                 mbti,
                 profile,
                 department,
-                age
+                age,
+                gender
         );
         return student;
     }
