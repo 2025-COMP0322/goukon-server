@@ -82,9 +82,9 @@
 
 ## 😄 BackEnd Contributor
 
-|                  Sunwoo An                   |                           Bohyung Jang                           |                 Sangmin Lee                  |
-|:--------------------------------------------:|:----------------------------------------------------------------:|:--------------------------------------------:|
-| <img width="240px" src="/photos/reze.jpg" /> |           <img width="240px" src="/photos/reze.jpg" />           | <img width="240px" src="/photos/reze.jpg" /> |
-|  [@sunja-An](https://github.com/sunja1472)   |                [@jbh010204](https://github.com/jbh010204)                 |  [@lsmin3388](https://github.com/lsmin3388)   |
-|              Birth - 2001.12.24              |                        Birth - 2001.12.24                        |              Birth - 2001.12.24              |
-|      National - 🇰🇷 Republic Of Korea       |                National - 🇰🇷 Republic Of Korea                 |      National - 🇰🇷 Republic Of Korea       |
+|                            Sunwoo An                            |                         Bohyung Jang                         |                         Sangmin Lee                          |
+|:---------------------------------------------------------------:|:------------------------------------------------------------:|:------------------------------------------------------------:|
+| <img width="240px" src="https://www.github.com/Sunja-An.png" /> | <img width="240px" src="https://github.com/jbh010204.png" /> | <img width="240px" src="https://github.com/lsmin3388.png" /> |
+|            [@sunja-An](https://github.com/sunja1472)            |          [@jbh010204](https://github.com/jbh010204)          |          [@lsmin3388](https://github.com/lsmin3388)          |
+|                       Birth - 2001.12.24                        |                      Birth - 2001.12.24                      |                      Birth - 2001.12.24                      |
+|                National - 🇰🇷 Republic Of Korea                |              National - 🇰🇷 Republic Of Korea               |              National - 🇰🇷 Republic Of Korea               |
