@@ -29,6 +29,8 @@ spring:
   # Redis/Valkey Configuration
   data:
     redis:
+      repositories:
+        enabled: false
       host: ${VALKEY_HOST:localhost}
       port: ${VALKEY_PORT:6379}
       timeout: 5000ms
