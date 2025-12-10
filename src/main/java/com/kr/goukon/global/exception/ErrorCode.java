@@ -13,6 +13,9 @@ public enum ErrorCode {
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "TE_003", "토큰이 만료되었습니다"),
     INVALID_HEADER(HttpStatus.UNAUTHORIZED, "TE_004", "유효하지 않은 Authorization Header 입니다."),
     INVALID_TOKEN_PROVIDER(HttpStatus.INTERNAL_SERVER_ERROR, "TE_005", "유효하지 않는 Token Provider 를 적용시켰습니다."),
+    NO_AUTHORITY(HttpStatus.UNAUTHORIZED, "TE_006", "유효하지 않은 접근입니다."),
+    NO_ATTRIBUTES(HttpStatus.NOT_FOUND, "TE_007", "속성을 찾을 수 없습니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "TE_008", "유효하지 않거나 만료된 Refresh Token입니다."),
 
     // * Auth
     WRONG_MBTI(HttpStatus.BAD_REQUEST, "AE_001", "MBTI 값이 올바르지 않습니다"),
@@ -24,6 +27,7 @@ public enum ErrorCode {
     // * Student
     STUDENT_NOT_FOUND(HttpStatus.NOT_FOUND, "SE_001", "학생을 찾을 수 없습니다."),
     INVALID_AGE(HttpStatus.BAD_REQUEST, "SE_002", "나이는 18세 이상 30세 이하여야 합니다."),
+    CANNOT_CONVERT_ROLE(HttpStatus.BAD_REQUEST," SE_003", "서비스에 해당되지 않는 역할군입니다."),
 
     // * Group
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "GE_001", "그룹을 찾을 수 없습니다."),

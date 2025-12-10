@@ -7,6 +7,7 @@ import com.kr.goukon.global.exception.BusinessException;
 import com.kr.goukon.global.utils.DateUtils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import javax.crypto.SecretKey;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -38,6 +39,11 @@ public class TokenProvider implements TokenService {
                 .expiration(token.getExpiredTime())
                 .signWith(token.secretKey())
                 .compact();
+    }
+
+    @Override
+    public SecretKey getSecretKey(TokenType type) {
+        return tokens.get(type).secretKey();
     }
 
     @Override

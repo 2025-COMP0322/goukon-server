@@ -1,0 +1,28 @@
+package com.kr.goukon.global.exception;
+
+import lombok.Getter;
+import org.springframework.http.HttpStatus;
+
+@Getter
+public class VerificationException extends RuntimeException {
+
+    private final HttpStatus status;
+    private final String code;
+    private final String message;
+
+    public VerificationException(ErrorCode errorCode) {
+        this.status = errorCode.getStatus();
+        this.code = errorCode.getCode();
+        this.message = errorCode.getMessage();
+    }
+
+    public VerificationException(ErrorCode errorCode, Object... cause) {
+        this.status = errorCode.getStatus();
+        this.code = errorCode.getCode();
+        this.message = String.format(errorCode.getMessage(), cause);
+    }
+
+    public String getErrorMessage(){
+        return "["+code+"]" +  " : " + message;
+    }
+}
