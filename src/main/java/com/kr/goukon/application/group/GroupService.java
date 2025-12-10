@@ -4,12 +4,14 @@ import com.kr.goukon.domain.group.Group;
 import com.kr.goukon.domain.group.GroupStatus;
 import com.kr.goukon.domain.group.repository.GroupRepository;
 import com.kr.goukon.domain.matchingqueue.MatchingType;
+import com.kr.goukon.domain.matchingqueue.repository.MatchingQueueRepository;
 import com.kr.goukon.domain.student.Gender;
 import com.kr.goukon.domain.student.Student;
 import com.kr.goukon.domain.student.repository.StudentRepository;
 import com.kr.goukon.domain.studentgroup.StudentGroup;
-import com.kr.goukon.domain.studentgroup.StudentGroupId;
 import com.kr.goukon.domain.studentgroup.repository.StudentGroupRepository;
+import com.kr.goukon.domain.sessionmatches.SessionMatches;
+import com.kr.goukon.domain.sessionmatches.repository.SessionMatchesRepository;
 import com.kr.goukon.global.exception.BusinessException;
 import com.kr.goukon.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,8 @@ public class GroupService {
     private final GroupRepository groupRepository;
     private final StudentRepository studentRepository;
     private final StudentGroupRepository studentGroupRepository;
+    private final MatchingQueueRepository matchingQueueRepository;
+    private final SessionMatchesRepository sessionMatchesRepository;
 
     @Transactional
     public Group createGroup(Long creatorId) {
@@ -150,6 +154,7 @@ public class GroupService {
         // 그룹에 아무도 없으면 그룹 삭제
         long remainingCount = studentGroupRepository.countByGroupId(groupId);
         if (remainingCount == 0) {
+            cleanupGroupDependencies(group);
             groupRepository.delete(group);
             log.info("Group {} deleted because it's empty", groupId);
         }
@@ -179,6 +184,8 @@ public class GroupService {
         List<StudentGroup> members = studentGroupRepository.findByGroupId(groupId);
         studentGroupRepository.deleteAll(members);
 
+        cleanupGroupDependencies(group);
+
         // 그룹 삭제
         groupRepository.delete(group);
 
@@ -197,5 +204,15 @@ public class GroupService {
      */
     public boolean isMember(Long groupId, Long studentId) {
         return studentGroupRepository.existsByStudentIdAndGroupId(studentId, groupId);
+    }
+
+    private void cleanupGroupDependencies(Group group) {
+        List<SessionMatches> matches = sessionMatchesRepository.findByGroupId(group.getId());
+        if (!matches.isEmpty()) {
+            sessionMatchesRepository.deleteAll(matches);
+        }
+
+        matchingQueueRepository.findByGroupId(group.getId())
+                .ifPresent(matchingQueueRepository::delete);
     }
 }
