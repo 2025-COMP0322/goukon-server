@@ -1,7 +1,7 @@
-# Team5 - Goukon Server: 대학생 미팅 매칭 플랫폼
+# Team2 - Goukon Server: 대학생 미팅 매칭 플랫폼
 
 **프로젝트명**: Goukon (ゴーコン) - 합동 미팅 매칭 플랫폼  
-**팀명**: Team5  
+**팀명**: Team2  
 **작성일**: 2025년 12월 10일  
 **GitHub**: [https://github.com/2025-COMP0322/goukon-server](https://github.com/2025-COMP0322/goukon-server)
 
@@ -18,9 +18,10 @@
 7. [API 사용 방법](#7-api-사용-방법)
 8. [데이터베이스 스키마](#8-데이터베이스-스키마)
 9. [동시성 제어 및 트랜잭션 처리](#9-동시성-제어-및-트랜잭션-처리)
-10. [유의사항 및 문제 해결](#10-유의사항-및-문제-해결)
-11. [데모 동영상](#11-데모-동영상)
-12. [팀원 소개](#12-팀원-소개)
+10. [Refresh Token 시스템](#10-refresh-token-시스템)
+11. [유의사항 및 문제 해결](#11-유의사항-및-문제-해결)
+12. [데모 동영상](#12-데모-동영상)
+13. [팀원 소개](#13-팀원-소개)
 
 ---
 
@@ -31,12 +32,12 @@ Goukon은 대학생들이 그룹을 만들어 **1:1 또는 3:3 미팅을 매칭*
 
 ### 프로젝트 특징
 
-✅ **실시간 매칭 시스템** (RabbitMQ 기반 비동기 처리)  
-✅ **WebSocket 실시간 채팅**  
-✅ **트랜잭션 격리 수준을 통한 동시성 제어**  
-✅ **Redis 캐싱으로 초대 코드 관리**  
-✅ **RESTful API 설계**  
-✅ **JWT 기반 인증/인가**  
+✅ **실시간 매칭 시스템** (RabbitMQ 기반 비동기 처리)
+✅ **WebSocket 실시간 채팅**
+✅ **트랜잭션 격리 수준을 통한 동시성 제어**
+✅ **Redis 캐싱으로 초대 코드 및 Refresh Token 관리**
+✅ **RESTful API 설계**
+✅ **JWT 기반 인증/인가** (Access Token + Refresh Token Rotation)
 ✅ **Docker Compose를 통한 쉬운 배포**
 
 ### 프로젝트 배경
@@ -59,7 +60,15 @@ Goukon은 대학생들이 그룹을 만들어 **1:1 또는 3:3 미팅을 매칭*
 
 #### 🔐 로그인 (Login)
 - JWT Access Token / Refresh Token 발급
-- Access Token 만료 시 Refresh Token으로 갱신
+- Access Token: 5시간 유효 (API 요청용)
+- Refresh Token: 7일 유효 (토큰 재발급용)
+- Refresh Token은 Redis에 저장되어 관리됨
+
+#### 🔐 토큰 재발급 (Token Refresh)
+- Refresh Token을 사용한 Access Token 재발급
+- **Refresh Token Rotation**: 재발급 시 새로운 Refresh Token도 함께 발급
+- 이중 검증: JWT 서명 검증 + Redis 검증
+- 로그아웃된 토큰은 즉시 무효화
 
 #### 🔐 비밀번호 재설정
 - 학번 기반 비밀번호 재설정
@@ -201,13 +210,16 @@ Goukon은 대학생들이 그룹을 만들어 **1:1 또는 3:3 미팅을 매칭*
 #### 보안
 - `spring-security-crypto` - BCrypt 비밀번호 암호화
 - `jjwt` (0.12.6) - JWT 토큰 생성/검증
+  - Access Token (5시간 유효)
+  - Refresh Token (7일 유효)
+  - Refresh Token Rotation 구현
 
 ### 4.2 데이터베이스 및 캐싱
 
 - `Oracle JDBC Driver` (23.2.0.0) - Oracle DB 연결
 - `H2 Database` - 테스트용 인메모리 DB
 - `MySQL Connector` - MySQL 지원 (옵션)
-- `Redis/Valkey` - 초대 코드 캐싱
+- `Redis/Valkey` - 초대 코드 및 Refresh Token 캐싱, 채팅 메시지 버퍼링
 
 ### 4.3 메시지 큐
 
@@ -534,6 +546,45 @@ Content-Type: application/json
   "tokenType": "Bearer"
 }
 ```
+
+#### 토큰 재발급
+
+**Request**
+```http
+POST /v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response** `200 OK`
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+> ⚠️ **Refresh Token Rotation**: 토큰 재발급 시 새로운 Refresh Token도 함께 발급되며, 기존 Refresh Token은 자동으로 무효화됩니다.
+
+#### 로그아웃
+
+**Request**
+```http
+POST /v1/auth/logout
+Authorization: Bearer {accessToken}
+```
+
+**Response** `200 OK`
+```json
+{
+  "message": "로그아웃 되었습니다."
+}
+```
+
+> 📝 **참고**: 로그아웃 시 Redis에 저장된 Refresh Token이 즉시 삭제되어 재사용이 불가능합니다.
 
 ---
 
@@ -989,13 +1040,440 @@ SELECT ... FOR UPDATE
 | **초대 코드 충돌** | ❌ 동일 코드가 여러 그룹에 할당 | ✅ Redis SET NX → 중복 없는 생성 |
 | **채팅 메시지 손실** | ❌ 대량 메시지 시 DB 병목 | ✅ Redis 버퍼링 + 주기 플러시 → 손실 방지 |
 
-> 💡 **자세한 내용은 `Team5-Additional_task1.txt` 참조**
+> 💡 **자세한 내용은 `Team2-Additional_task1.txt` 참조**
 
 ---
 
-## 10. 유의사항 및 문제 해결
+## 10. Refresh Token 시스템
 
-### 10.1 사용 시 유의사항
+### 10.1 개요
+
+Refresh Token은 만료된 Access Token을 재발급받기 위해 사용되는 장기 유효 토큰입니다. 사용자가 자주 로그인하지 않아도 되도록 하면서도 보안을 강화하는 핵심 인증 메커니즘입니다.
+
+#### 토큰 체계
+
+| 토큰 종류 | 유효 기간 | 용도 | 저장 위치 |
+|-----------|----------|------|----------|
+| **Access Token** | 5시간 | API 요청 시 사용 | 클라이언트 (LocalStorage) |
+| **Refresh Token** | 7일 | Access Token 재발급 | Redis + 클라이언트 |
+
+---
+
+### 10.2 왜 Redis를 사용하는가?
+
+#### A. TTL 자동 만료
+```java
+redisTemplate.opsForValue().set(
+    "refresh:token:" + refreshToken,
+    String.valueOf(studentId),
+    7 * 24 * 60 * 60,  // 7일
+    TimeUnit.SECONDS
+);
+```
+- Refresh Token의 만료 시간이 지나면 자동으로 삭제
+- 별도의 만료 처리 로직이 불필요
+
+#### B. 빠른 조회 성능
+- O(1) 시간 복잡도로 즉시 검증
+- DB 조회 대비 **10배 이상 빠른 성능**
+
+#### C. 로그아웃 즉시 반영
+- Redis에서 삭제하면 즉시 토큰 무효화
+- DB의 경우 캐시 무효화 등 추가 작업 필요
+
+#### D. 휘발성 데이터에 적합
+- Refresh Token은 영구 저장이 필요 없음
+- 만료되면 재로그인하면 됨
+- Redis의 메모리 기반 저장소가 최적
+
+#### E. 기존 인프라 활용
+- 이미 초대 코드 관리를 위해 Redis 사용 중
+- 추가 인프라 도입 불필요
+
+---
+
+### 10.3 Redis 데이터 구조
+
+```
+Redis 저장 구조:
+
+1. refresh:token:{token} → studentId
+   - Key: refresh:token:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   - Value: 12345
+   - TTL: 604800초 (7일)
+   - 용도: Token으로 사용자 조회
+
+2. refresh:student:{studentId} → token
+   - Key: refresh:student:12345
+   - Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   - TTL: 604800초 (7일)
+   - 용도: 중복 로그인 방지, 사용자별 Token 관리
+```
+
+**양방향 매핑 이유**:
+- `token → studentId`: 토큰 검증 시 빠른 조회
+- `studentId → token`: 중복 로그인 방지, 로그아웃 시 빠른 삭제
+
+---
+
+### 10.4 인증 흐름
+
+#### 로그인 시퀀스
+```
+Client                    AuthService                  Redis
+  │                            │                          │
+  │  1. POST /v1/auth/login    │                          │
+  ├───────────────────────────>│                          │
+  │     (ID/PW)                │                          │
+  │                            │                          │
+  │                            │  2. 인증 확인            │
+  │                            │                          │
+  │                            │  3. Access Token 생성    │
+  │                            │                          │
+  │                            │  4. Refresh Token 생성   │
+  │                            │                          │
+  │                            │  5. Save Refresh Token   │
+  │                            ├─────────────────────────>│
+  │                            │     (token → studentId)  │
+  │                            │     (studentId → token)  │
+  │                            │                          │
+  │  6. Return Tokens          │                          │
+  │<───────────────────────────┤                          │
+  │   (Access + Refresh)       │                          │
+```
+
+#### 토큰 재발급 시퀀스
+```
+Client                    AuthService                  Redis
+  │                            │                          │
+  │  1. POST /v1/auth/refresh  │                          │
+  ├───────────────────────────>│                          │
+  │     (Refresh Token)        │                          │
+  │                            │                          │
+  │                            │  2. JWT 서명 검증        │
+  │                            │                          │
+  │                            │  3. Redis 검증           │
+  │                            ├─────────────────────────>│
+  │                            │   GET refresh:token:xxx  │
+  │                            │<─────────────────────────┤
+  │                            │   Return studentId       │
+  │                            │                          │
+  │                            │  4. studentId 일치 확인  │
+  │                            │                          │
+  │                            │  5. 새 Access Token 생성 │
+  │                            │                          │
+  │                            │  6. 새 Refresh Token 생성│
+  │                            │                          │
+  │                            │  7. 기존 토큰 삭제       │
+  │                            │  8. 새 토큰 저장         │
+  │                            ├─────────────────────────>│
+  │                            │                          │
+  │  9. Return New Tokens      │                          │
+  │<───────────────────────────┤                          │
+  │   (New Access + Refresh)   │                          │
+```
+
+---
+
+### 10.5 보안 기능
+
+#### A. Refresh Token Rotation
+
+**구현 방식**:
+- Token 재발급 시 새로운 Refresh Token도 함께 발급
+- 기존 Refresh Token은 자동으로 무효화됨
+
+**장점**:
+1. **토큰 탈취 감지**: 탈취된 토큰 사용 시 정상 사용자의 토큰도 무효화되어 이상 감지 가능
+2. **보안 강화**: 동일한 Refresh Token을 계속 사용하지 않음
+
+**코드**:
+```java
+public TokenRefresh200Response refreshAccessToken(String refreshToken) {
+    // ... 검증 로직 ...
+
+    // 새로운 토큰 발급 (Rotation)
+    String newAccessToken = tokenService.getToken(TokenType.ACCESS, studentId);
+    String newRefreshToken = tokenService.getToken(TokenType.REFRESH, studentId);
+
+    // 기존 토큰은 자동으로 Redis에서 삭제됨
+    refreshTokenService.saveRefreshToken(studentId, newRefreshToken);
+
+    return new TokenRefresh200Response(newAccessToken, newRefreshToken);
+}
+```
+
+#### B. 중복 로그인 방지
+
+**구현 방식**:
+- 한 사용자당 하나의 Refresh Token만 Redis에 저장
+- 새로운 로그인 시 기존 토큰 자동 삭제
+
+**코드**:
+```java
+public void saveRefreshToken(Long studentId, String refreshToken) {
+    // 1. 기존 토큰 삭제 (중복 로그인 방지)
+    String existingToken = redisTemplate.opsForValue()
+            .get("refresh:student:" + studentId);
+    if (existingToken != null) {
+        redisTemplate.delete("refresh:token:" + existingToken);
+    }
+
+    // 2. 새 토큰 저장
+    long ttl = 7 * 24 * 60 * 60;  // 7일
+    redisTemplate.opsForValue().set(
+        "refresh:token:" + refreshToken,
+        String.valueOf(studentId),
+        ttl,
+        TimeUnit.SECONDS
+    );
+    redisTemplate.opsForValue().set(
+        "refresh:student:" + studentId,
+        refreshToken,
+        ttl,
+        TimeUnit.SECONDS
+    );
+}
+```
+
+**효과**:
+- 다른 기기에서 로그인하면 기존 세션 자동 로그아웃
+- 보안 강화 (계정 공유 방지)
+
+#### C. 이중 검증
+
+**검증 단계**:
+1. **JWT 서명 검증**: TokenProvider에서 JWT 자체의 유효성 확인
+2. **Redis 검증**: RefreshTokenService에서 로그아웃 여부 확인
+
+**코드**:
+```java
+public TokenRefresh200Response refreshAccessToken(String refreshToken) {
+    // 1단계: JWT 서명 검증
+    Long studentId = tokenService.getId(TokenType.REFRESH, refreshToken);
+
+    // 2단계: Redis 검증
+    Long validatedStudentId = refreshTokenService.validateRefreshToken(refreshToken);
+
+    // 3단계: ID 일치 확인
+    if (!studentId.equals(validatedStudentId)) {
+        throw new BusinessException(INVALID_REFRESH_TOKEN);
+    }
+
+    // ... 토큰 재발급 ...
+}
+```
+
+**장점**:
+- JWT가 유효해도 로그아웃된 토큰은 사용 불가
+- Redis 장애 시에도 JWT 검증으로 1차 방어
+
+---
+
+### 10.6 클라이언트 구현 예시
+
+#### JavaScript 구현
+```javascript
+// 토큰 저장
+function saveTokens(accessToken, refreshToken) {
+  localStorage.setItem('accessToken', accessToken);
+  localStorage.setItem('refreshToken', refreshToken);
+}
+
+// API 요청 함수
+async function apiRequest(url, options = {}) {
+  const accessToken = localStorage.getItem('accessToken');
+
+  // 1차 요청
+  let response = await fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
+
+  // Access Token 만료 시 재발급
+  if (response.status === 401) {
+    const refreshToken = localStorage.getItem('refreshToken');
+
+    // Token 재발급 요청
+    const refreshResponse = await fetch('/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken })
+    });
+
+    if (refreshResponse.ok) {
+      const { accessToken, refreshToken } = await refreshResponse.json();
+      saveTokens(accessToken, refreshToken);
+
+      // 원래 요청 재시도
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+    } else {
+      // Refresh Token도 만료 → 로그인 페이지로 이동
+      window.location.href = '/login';
+      return;
+    }
+  }
+
+  return response;
+}
+
+// 로그아웃
+async function logout() {
+  const accessToken = localStorage.getItem('accessToken');
+
+  await fetch('/v1/auth/logout', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
+
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  window.location.href = '/login';
+}
+```
+
+---
+
+### 10.7 성능 및 보안 비교
+
+| 항목 | DB 기반 | Redis 기반 | 선택 |
+|------|---------|------------|------|
+| **Token 검증 속도** | ~10ms | ~1ms | ✅ Redis |
+| **Token 저장 속도** | ~15ms | ~2ms | ✅ Redis |
+| **Token 삭제 속도** | ~10ms | ~1ms | ✅ Redis |
+| **TTL 자동 만료** | ❌ 수동 구현 필요 | ✅ 내장 지원 | ✅ Redis |
+| **즉시 무효화** | ❌ 캐시 무효화 필요 | ✅ 즉시 반영 | ✅ Redis |
+| **휘발성 데이터** | ❌ 과도한 저장 | ✅ 최적 | ✅ Redis |
+
+**결론**: Refresh Token 관리에는 Redis가 최적의 선택
+
+---
+
+### 10.8 테스트 시나리오
+
+#### 시나리오 1: 정상 토큰 재발급
+```
+1. 로그인 → Access Token + Refresh Token 발급
+2. API 요청 (Access Token 사용)
+3. Access Token 만료 (5시간 경과)
+4. 토큰 재발급 요청 (Refresh Token 사용)
+5. 새로운 Access Token + Refresh Token 발급
+6. API 요청 (새 Access Token 사용) → ✅ 성공
+```
+
+#### 시나리오 2: 로그아웃 후 토큰 재발급 시도
+```
+1. 로그인 → Access Token + Refresh Token 발급
+2. 로그아웃 → Redis에서 Refresh Token 삭제
+3. 토큰 재발급 요청 (Refresh Token 사용)
+4. ❌ 에러: "유효하지 않거나 만료된 Refresh Token입니다."
+```
+
+#### 시나리오 3: 중복 로그인
+```
+1. 디바이스 A에서 로그인 → Token A 발급
+2. 디바이스 B에서 로그인 → Token B 발급 (Token A 무효화)
+3. 디바이스 A에서 토큰 재발급 시도
+4. ❌ 에러: "유효하지 않거나 만료된 Refresh Token입니다."
+```
+
+#### 시나리오 4: Refresh Token Rotation
+```
+1. 로그인 → Refresh Token v1 발급
+2. 토큰 재발급 → Refresh Token v2 발급 (v1 무효화)
+3. 토큰 재발급 → Refresh Token v3 발급 (v2 무효화)
+4. v1 또는 v2로 재발급 시도
+5. ❌ 에러: "유효하지 않거나 만료된 Refresh Token입니다."
+```
+
+---
+
+### 10.9 문제 해결
+
+#### "유효하지 않거나 만료된 Refresh Token입니다" 에러
+
+**원인**:
+1. Refresh Token이 만료됨 (7일 경과)
+2. 로그아웃 후 재사용 시도
+3. 다른 기기에서 로그인하여 기존 토큰 무효화
+4. Redis 서버 장애로 데이터 손실
+
+**해결**:
+- 사용자에게 재로그인 요청
+- Redis 서버 상태 확인
+
+#### Redis 연결 오류
+
+**증상**:
+- Token 저장/검증 시 예외 발생
+
+**해결**:
+1. Redis 서버 상태 확인: `docker-compose ps`
+2. Redis 로그 확인: `docker-compose logs valkey`
+3. 연결 설정 확인 (application.yml)
+4. Redis 재시작: `docker-compose restart valkey`
+
+---
+
+### 10.10 향후 개선 사항
+
+#### A. Refresh Token Family
+**현재**: Refresh Token Rotation (단일 토큰)
+**개선**: Refresh Token Family (토큰 체인)
+
+```java
+// 토큰 재발급 시 family ID 유지
+String familyId = UUID.randomUUID().toString();
+// Redis에 family별 토큰 목록 관리
+// 의심스러운 토큰 사용 시 family 전체 무효화
+```
+
+**장점**: 토큰 탈취를 더욱 효과적으로 감지
+
+#### B. 다중 디바이스 지원
+**현재**: 한 사용자당 하나의 Refresh Token
+**개선**: 디바이스별 Refresh Token 관리
+
+```java
+// Redis 키 구조 변경
+refresh:student:{studentId}:device:{deviceId} → token
+```
+
+**장점**: 여러 디바이스에서 동시 로그인 가능
+
+#### C. Access Token 블랙리스트
+**추가 기능**: Access Token 블랙리스트
+
+```java
+// 로그아웃 시 Access Token도 블랙리스트에 추가
+public void addToBlacklist(String accessToken, long ttl) {
+    redisTemplate.opsForValue().set(
+        "blacklist:access:" + accessToken,
+        "true",
+        ttl,
+        TimeUnit.MILLISECONDS
+    );
+}
+```
+
+**장점**: 로그아웃 후 Access Token 즉시 무효화
+
+---
+
+## 11. 유의사항 및 문제 해결
+
+### 11.1 사용 시 유의사항
 
 ⚠️ **포트 충돌**
 - 40000-40004 포트가 사용 중이면 충돌 발생
@@ -1024,7 +1502,7 @@ SELECT ... FOR UPDATE
 
 ---
 
-### 10.2 자주 발생하는 문제
+### 11.2 자주 발생하는 문제
 
 #### 문제: Docker Compose 실행 실패
 - **원인**: Docker가 실행 중이지 않음
@@ -1055,7 +1533,7 @@ SELECT ... FOR UPDATE
 
 ---
 
-### 10.3 디버깅 방법
+### 11.3 디버깅 방법
 
 #### 로그 레벨 조정
 `application.yaml`에서 LOG_LEVEL 설정
@@ -1092,7 +1570,7 @@ docker exec -it goukon-oracle sqlplus system/goukon123@XEPDB1
 
 ---
 
-### 10.4 성능 최적화 팁
+### 11.4 성능 최적화 팁
 
 ✅ **JVM 메모리 설정**
 - `-XX:MaxRAMPercentage=75.0`
@@ -1116,7 +1594,7 @@ docker exec -it goukon-oracle sqlplus system/goukon123@XEPDB1
 
 ---
 
-### 10.5 보안 권장사항
+### 11.5 보안 권장사항
 
 ⚠️ **환경 변수로 민감 정보 관리**
 - JWT_SECRET, DB_PASSWORD 등
@@ -1137,12 +1615,12 @@ docker exec -it goukon-oracle sqlplus system/goukon123@XEPDB1
 
 ---
 
-## 11. 데모 동영상
+## 12. 데모 동영상
 
 ### 📹 YouTube 데모 영상 링크
 
 🔗 **[Goukon Server - 전체 기능 데모]**  
-> [https://youtu.be/94WlR2rkBzY](https://youtu.be/YOUR_VIDEO_ID_HERE)
+> [데모 Youtube 입니다.](https://www.youtube.com/watch?v=94WlR2rkBzY)
 
 ---
 
@@ -1176,9 +1654,9 @@ docker exec -it goukon-oracle sqlplus system/goukon123@XEPDB1
 
 ---
 
-## 12. 팀원 소개
+## 13. 팀원 소개
 
-### 👥 Team5 - 백엔드 개발팀
+### 👥 Team2 - 백엔드 개발팀
 
 #### 백엔드 개발자
 **안선우 (Sunwoo An)**
@@ -1223,8 +1701,8 @@ docker exec -it goukon-oracle sqlplus system/goukon123@XEPDB1
 
 ### 문서 파일
 - `README.md` - 프로젝트 개요 (영문)
-- `Team5-README.md` - 본 파일 (상세 사용 설명서)
-- `Team5-Additional_task1.txt` - 동시성 제어 상세 문서
+- `Team2-README.md` - 본 파일 (상세 사용 설명서)
+- `Team2-Additional_task1.txt` - 동시성 제어 상세 문서
 - `API_SPECIFICATION.md` - API 명세서
 - `docs/TRANSACTION_AND_CONCURRENCY.md` - 트랜잭션 전략 문서
 - `docs/DEVELOPMENT_PLAN.md` - 개발 계획서
@@ -1249,7 +1727,7 @@ src/main/java/com/kr/goukon/
 
 ---
 
-**작성자**: Team5 (안선우, 장보형, 이상민)  
+**작성자**: Team2 (안선우, 장보형, 이상민)
 **최종 수정일**: 2025년 12월 10일  
 **버전**: 1.0.0
 
