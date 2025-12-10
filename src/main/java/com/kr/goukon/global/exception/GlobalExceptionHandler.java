@@ -28,6 +28,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(e.getStatus()).body(response);
     }
 
+    @ExceptionHandler(VerificationException.class)
+    public ResponseEntity<ErrorResponse> handleVerficationException(VerificationException e) {
+        log.warn("Business exception: {} - {}", e.getCode(), e.getMessage());
+        ErrorResponse response = ErrorResponse.of(
+                e.getCode(),
+                e.getMessage(),
+                e.getStatus().value()
+        );
+        return ResponseEntity.status(e.getStatus()).body(response);
+    }
+
     /**
      * Validation 예외 처리
      */
