@@ -96,13 +96,12 @@ public class Student extends BaseEntity {
     }
 
     // 프로필 정보 업데이트
-    public void updateProfile(String name, Mbti mbti, String profile, String department, Integer age, Gender gender) {
+    public void updateProfile(String name, Mbti mbti, String profile, String department, Integer age) {
         if (name != null) this.name = name;
         if (mbti != null) this.mbti = mbti;
         if (profile != null) this.profile = profile;
         if (department != null) this.department = department;
         if (age != null) this.age = age;
-        if (gender != null) this.gender = gender;
     }
 
     // 프로필 완료 여부 체크 (필수: age, gender, department)

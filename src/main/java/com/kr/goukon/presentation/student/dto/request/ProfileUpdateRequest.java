@@ -8,6 +8,5 @@ public record ProfileUpdateRequest(
         String mbti,
         String profile,
         String department,
-        @Min(18) @Max(30) Integer age,
-        String gender  // "M" or "F"
+        @Min(18) @Max(30) Integer age
 ) {}

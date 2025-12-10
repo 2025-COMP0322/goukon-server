@@ -6,6 +6,7 @@ import com.kr.goukon.global.annotation.AuthUser;
 import com.kr.goukon.presentation.student.dto.request.ProfileUpdateRequest;
 import com.kr.goukon.presentation.student.dto.response.StudentResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/v1/students")
 @RequiredArgsConstructor
+@Slf4j
 public class StudentController {
 
     private final StudentService studentService;
@@ -50,8 +52,7 @@ public class StudentController {
                 request.mbti(),
                 request.profile(),
                 request.department(),
-                request.age(),
-                request.gender()
+                request.age()
         );
         return ResponseEntity.ok(StudentResponse.from(student));
     }
